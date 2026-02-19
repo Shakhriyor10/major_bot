@@ -30,6 +30,18 @@ DB_PATH = "dealership.db"
 
 router = Router()
 
+ADD_CAR_STEPS = [
+    ("title", "Введите название автомобиля (например: BMW X5 2022):"),
+    ("price", "Введите цену (например: 5 900 000 ₽):"),
+    ("year", "Введите год выпуска (например: 2022):"),
+    ("mileage", "Введите пробег (например: 45 000 км):"),
+    ("engine", "Введите двигатель (например: 3.0 л, 340 л.с.):"),
+    ("transmission", "Введите коробку передач (например: Автомат):"),
+    ("description", "Введите описание автомобиля:"),
+    ("image_url", "Введите ссылку на фото (или отправьте '-' чтобы использовать стандартное изображение):"),
+]
+ADMIN_CAR_DRAFTS: dict[int, dict[str, str]] = {}
+
 
 def init_db() -> None:
     conn = sqlite3.connect(DB_PATH)
@@ -247,14 +259,94 @@ async def handle_contact(message: Message) -> None:
 async def addcar_cmd(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return
-    payload = message.text.replace("/addcar", "", 1).strip()
-    parts = [p.strip() for p in payload.split("|")]
-    if len(parts) != 8:
-        await message.answer(
-            "Формат:\n/addcar title | price | year | mileage | engine | transmission | description | image_url"
-        )
+
+    payload = (message.text or "").replace("/addcar", "", 1).strip()
+    if payload:
+        parts = [p.strip() for p in payload.split("|")]
+        if len(parts) != 8:
+            await message.answer(
+                "Формат:\n/addcar title | price | year | mileage | engine | transmission | description | image_url"
+            )
+            return
+        car_id = add_car(parts)
+        await message.answer(f"✅ Машина добавлена. ID: {car_id}")
         return
-    car_id = add_car(parts)
+
+    ADMIN_CAR_DRAFTS[message.from_user.id] = {}
+    _, first_prompt = ADD_CAR_STEPS[0]
+    await message.answer(
+        "🛠 Режим добавления автомобиля запущен.\n"
+        "Отправляйте данные по шагам. Для отмены: /cancelcar\n\n"
+        f"{first_prompt}"
+    )
+
+
+def _get_next_addcar_step(draft: dict[str, str]) -> tuple[str, str] | None:
+    for key, prompt in ADD_CAR_STEPS:
+        if key not in draft:
+            return key, prompt
+    return None
+
+
+@router.message(Command("cancelcar"))
+async def cancelcar_cmd(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        return
+
+    if ADMIN_CAR_DRAFTS.pop(message.from_user.id, None) is None:
+        await message.answer("Нет активного добавления автомобиля.")
+        return
+
+    await message.answer("Добавление автомобиля отменено.")
+
+
+@router.message(F.text)
+async def addcar_step_handler(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        return
+    if message.chat.type != "private":
+        return
+
+    draft = ADMIN_CAR_DRAFTS.get(message.from_user.id)
+    if draft is None:
+        return
+
+    text_value = (message.text or "").strip()
+    if not text_value:
+        await message.answer("Пустое значение. Отправьте текст для текущего шага.")
+        return
+    if text_value.startswith("/"):
+        return
+
+    next_step = _get_next_addcar_step(draft)
+    if not next_step:
+        ADMIN_CAR_DRAFTS.pop(message.from_user.id, None)
+        return
+
+    key, _ = next_step
+    draft[key] = text_value
+
+    if key == "image_url" and draft[key] == "-":
+        draft[key] = "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
+
+    upcoming_step = _get_next_addcar_step(draft)
+    if upcoming_step:
+        _, next_prompt = upcoming_step
+        await message.answer(next_prompt)
+        return
+
+    fields = [
+        draft["title"],
+        draft["price"],
+        draft["year"],
+        draft["mileage"],
+        draft["engine"],
+        draft["transmission"],
+        draft["description"],
+        draft["image_url"],
+    ]
+    car_id = add_car(fields)
+    ADMIN_CAR_DRAFTS.pop(message.from_user.id, None)
     await message.answer(f"✅ Машина добавлена. ID: {car_id}")
 
 

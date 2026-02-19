@@ -8,9 +8,34 @@ if (tg) {
 const params = new URLSearchParams(window.location.search);
 const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
 const adminBox = document.getElementById('adminBox');
+const menuSection = document.getElementById('menuSection');
+const carsSection = document.getElementById('carsSection');
+const supportSection = document.getElementById('supportSection');
 const adminStatus = document.getElementById('adminStatus');
 const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
+let isAdminUser = false;
+
+function showMenu() {
+  menuSection.classList.remove('hidden');
+  carsSection.classList.add('hidden');
+  supportSection.classList.add('hidden');
+  adminBox.classList.add('hidden');
+}
+
+function openCars() {
+  menuSection.classList.add('hidden');
+  carsSection.classList.remove('hidden');
+  supportSection.classList.add('hidden');
+  if (isAdminUser) adminBox.classList.remove('hidden');
+}
+
+function openSupport() {
+  menuSection.classList.add('hidden');
+  carsSection.classList.add('hidden');
+  supportSection.classList.remove('hidden');
+  adminBox.classList.add('hidden');
+}
 
 async function loadCars() {
   const res = await fetch('/api/cars');
@@ -30,7 +55,7 @@ async function loadCars() {
         <p class="price">${car.price}</p>
         <div class="specs">Объем двигателя: ${car.engine}</div>
         <button class="btn" onclick="openCar(${car.id})">Подробнее</button>
-        ${adminBox.classList.contains('hidden') ? '' : `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>`}
+        ${isAdminUser ? `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>` : ''}
       </div>
     </article>
   `).join('');
@@ -114,11 +139,25 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
   }
 });
 
+document.querySelectorAll('.menu-card').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.target === 'carsSection') {
+      openCars();
+    } else {
+      openSupport();
+    }
+  });
+});
+
+document.getElementById('backToMenuFromCars').addEventListener('click', showMenu);
+document.getElementById('backToMenuFromSupport').addEventListener('click', showMenu);
+
 (async () => {
   const adminCheck = await fetch(`/api/is-admin?tg_id=${tgId}`);
   if (adminCheck.ok) {
     const data = await adminCheck.json();
-    if (data.is_admin) adminBox.classList.remove('hidden');
+    isAdminUser = Boolean(data.is_admin);
   }
+  showMenu();
   await loadCars();
 })();

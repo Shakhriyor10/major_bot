@@ -11,11 +11,29 @@
   <div class="container">
     <header class="header">
       <h1 class="title">🚘 Автосалон Premium Drive</h1>
-      <p class="subtitle">Каталог машин и быстрая поддержка прямо в Telegram</p>
+      <p class="subtitle">Красивый каталог машин и быстрая поддержка прямо в Telegram</p>
     </header>
 
     <section>
       <div id="cars" class="grid"></div>
+    </section>
+
+    <section id="adminBox" class="support-box hidden">
+      <h2>Панель администратора</h2>
+      <p class="subtitle">Добавление и редактирование машины: Название, Цена, Объем двигателя, Описание.</p>
+      <form id="adminForm" class="admin-form">
+        <input type="hidden" id="carId" />
+        <input id="title" placeholder="Название" required />
+        <input id="price" placeholder="Цена" required />
+        <input id="engine" placeholder="Объем двигателя" required />
+        <textarea id="description" placeholder="Описание" required></textarea>
+        <input id="image_url" placeholder="Ссылка на фото (необязательно)" />
+        <div class="admin-actions">
+          <button type="submit" class="btn">Сохранить</button>
+          <button type="button" id="cancelEdit" class="btn btn-secondary hidden">Отмена</button>
+        </div>
+      </form>
+      <p id="adminStatus" class="subtitle"></p>
     </section>
 
     <section class="support-box">

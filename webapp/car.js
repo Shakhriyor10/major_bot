@@ -1,5 +1,8 @@
 const tg = window.Telegram?.WebApp;
-if (tg) tg.ready();
+if (tg) {
+  tg.ready();
+  document.documentElement.dataset.theme = tg.colorScheme || 'light';
+}
 
 const params = new URLSearchParams(window.location.search);
 const carId = Number(params.get('id'));
@@ -26,10 +29,7 @@ async function loadCar() {
         <h1 class="car-title">${car.title}</h1>
         <p class="price">${car.price}</p>
         <ul class="feature-list">
-          <li><b>Год:</b> ${car.year}</li>
-          <li><b>Пробег:</b> ${car.mileage}</li>
-          <li><b>Двигатель:</b> ${car.engine}</li>
-          <li><b>Коробка:</b> ${car.transmission}</li>
+          <li><b>Объем двигателя:</b> ${car.engine}</li>
         </ul>
         <p>${car.description}</p>
       </div>

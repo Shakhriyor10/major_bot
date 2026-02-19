@@ -14,7 +14,21 @@
       <p class="subtitle">Красивый каталог машин и быстрая поддержка прямо в Telegram</p>
     </header>
 
-    <section>
+    <section id="menuSection" class="menu-grid">
+      <button class="menu-card" data-target="carsSection">
+        <span class="menu-card-icon">🚗</span>
+        <span class="menu-card-title">Автомобили</span>
+        <span class="menu-card-subtitle">Каталог доступных машин</span>
+      </button>
+      <button class="menu-card" data-target="supportSection">
+        <span class="menu-card-icon">🛟</span>
+        <span class="menu-card-title">Поддержка</span>
+        <span class="menu-card-subtitle">Оставьте вопрос менеджеру</span>
+      </button>
+    </section>
+
+    <section id="carsSection" class="hidden">
+      <button id="backToMenuFromCars" class="back-btn">← Назад к выбору</button>
       <div id="cars" class="grid"></div>
     </section>
 
@@ -36,7 +50,8 @@
       <p id="adminStatus" class="subtitle"></p>
     </section>
 
-    <section class="support-box">
+    <section id="supportSection" class="support-box hidden">
+      <button id="backToMenuFromSupport" class="back-btn">← Назад к выбору</button>
       <h2>Поддержка</h2>
       <p class="subtitle">Опишите вопрос, и менеджер ответит вам в Telegram.</p>
       <textarea id="supportText" placeholder="Например: Нужна помощь с выбором кроссовера до 3 млн ₽"></textarea>

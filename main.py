@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime
 from typing import Any
@@ -10,7 +11,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -200,12 +201,27 @@ def get_support_user(group_message_id: int) -> int | None:
     return int(row[0]) if row else None
 
 
+def extract_support_user_from_message(message: Message) -> int | None:
+    mapped_user = get_support_user(message.message_id)
+    if mapped_user:
+        return mapped_user
+
+    content = (message.text or message.caption or "").strip()
+    if not content:
+        return None
+
+    match = re.search(r"ID:\s*(?:<code>)?(\d+)(?:</code>)?", content)
+    if match:
+        return int(match.group(1))
+    return None
+
+
 def resolve_support_user(message: Message) -> int | None:
     current = message
     visited: set[int] = set()
     while current and current.message_id not in visited:
         visited.add(current.message_id)
-        user_id = get_support_user(current.message_id)
+        user_id = extract_support_user_from_message(current)
         if user_id:
             return user_id
         current = current.reply_to_message
@@ -428,6 +444,12 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
 
+    user_id = resolve_support_user(message.reply_to_message)
+    if not user_id:
+        return
+
+    save_support_map(message.message_id, user_id)
+
     is_authorized = False
     if message.sender_chat and message.sender_chat.id == SUPPORT_GROUP_ID:
         is_authorized = True
@@ -437,18 +459,15 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
         try:
             member = await bot.get_chat_member(message.chat.id, message.from_user.id)
             is_authorized = member.status in {"administrator", "creator"}
-        except TelegramBadRequest:
+        except TelegramAPIError:
             is_authorized = False
 
     if not is_authorized:
         return
 
-    user_id = resolve_support_user(message.reply_to_message)
-    if not user_id:
-        return
-
     reply_text = (message.text or message.caption or "").strip() or "[без текста]"
     await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
+
 
 
 async def app_page(_: web.Request) -> web.Response:

@@ -113,6 +113,18 @@ def save_user(message: Message, phone: str) -> None:
     conn.close()
 
 
+def get_user_phone(tg_id: int) -> str | None:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT phone FROM users WHERE tg_id=?", (tg_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    phone = (row[0] or "").strip()
+    return phone or None
+
+
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
@@ -248,6 +260,19 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
 
 @router.message(Command("start"))
 async def start_cmd(message: Message) -> None:
+    existing_phone = get_user_phone(message.from_user.id)
+    if existing_phone:
+        webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
+        kb = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="🚘 Открыть приложение", web_app=WebAppInfo(url=webapp_url))]],
+            resize_keyboard=True,
+        )
+        await message.answer(
+            "Вы уже зарегистрированы ✅\nМожно сразу открыть приложение.",
+            reply_markup=kb,
+        )
+        return
+
     kb = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📱 Отправить номер", request_contact=True)]],
         resize_keyboard=True,

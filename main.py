@@ -10,6 +10,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -19,7 +20,7 @@ from aiogram.types import (
 
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
-SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID", "0"))
+SUPPORT_GROUP_ID = -1003739992037
 ADMIN_IDS = {
     int(user_id.strip())
     for user_id in os.getenv("ADMIN_IDS", "8598163827").split(",")
@@ -197,6 +198,27 @@ def get_support_user(group_message_id: int) -> int | None:
     row = cur.fetchone()
     conn.close()
     return int(row[0]) if row else None
+
+
+def get_user_display(user_id: int) -> str:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT full_name, username FROM users WHERE tg_id=?", (user_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return f"ID {user_id}"
+
+    full_name = (row[0] or "").strip()
+    username = (row[1] or "").strip()
+    if full_name and username:
+        return f"{full_name} (@{username})"
+    if full_name:
+        return full_name
+    if username:
+        return f"@{username}"
+    return f"ID {user_id}"
 
 
 def _required_text(payload: dict[str, Any], key: str) -> str:
@@ -393,10 +415,21 @@ async def cars_cmd(message: Message) -> None:
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
+
+    try:
+        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+    except TelegramBadRequest:
+        return
+
+    if member.status not in {"administrator", "creator"}:
+        return
+
     user_id = get_support_user(message.reply_to_message.message_id)
     if not user_id:
         return
-    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{message.text or '[без текста]'}")
+
+    reply_text = (message.text or message.caption or "").strip() or "[без текста]"
+    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
 
 
 async def app_page(_: web.Request) -> web.Response:
@@ -457,9 +490,10 @@ async def api_support(request: web.Request) -> web.Response:
     if not SUPPORT_GROUP_ID:
         return web.json_response({"ok": False, "error": "group_not_set"}, status=500)
 
+    user_display = get_user_display(user_id)
     sent = await bot.send_message(
         SUPPORT_GROUP_ID,
-        f"🆘 Новое обращение\nПользователь: <code>{user_id}</code>\nСообщение: {message}",
+        f"🆘 Новое обращение\nПользователь: {user_display}\nID: <code>{user_id}</code>\nСообщение: {message}",
     )
     save_support_map(sent.message_id, user_id)
     return web.json_response({"ok": True})

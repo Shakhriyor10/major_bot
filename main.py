@@ -200,6 +200,18 @@ def get_support_user(group_message_id: int) -> int | None:
     return int(row[0]) if row else None
 
 
+def resolve_support_user(message: Message) -> int | None:
+    current = message
+    visited: set[int] = set()
+    while current and current.message_id not in visited:
+        visited.add(current.message_id)
+        user_id = get_support_user(current.message_id)
+        if user_id:
+            return user_id
+        current = current.reply_to_message
+    return None
+
+
 def get_user_display(user_id: int) -> str:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -416,15 +428,22 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
 
-    try:
-        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-    except TelegramBadRequest:
+    is_authorized = False
+    if message.sender_chat and message.sender_chat.id == SUPPORT_GROUP_ID:
+        is_authorized = True
+    elif message.from_user and is_admin(message.from_user.id):
+        is_authorized = True
+    elif message.from_user:
+        try:
+            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+            is_authorized = member.status in {"administrator", "creator"}
+        except TelegramBadRequest:
+            is_authorized = False
+
+    if not is_authorized:
         return
 
-    if member.status not in {"administrator", "creator"}:
-        return
-
-    user_id = get_support_user(message.reply_to_message.message_id)
+    user_id = resolve_support_user(message.reply_to_message)
     if not user_id:
         return
 

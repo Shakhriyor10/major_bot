@@ -187,6 +187,31 @@ def get_support_user(group_message_id: int) -> int | None:
     return int(row[0]) if row else None
 
 
+def _required_text(payload: dict[str, Any], key: str) -> str:
+    return str(payload.get(key, "")).strip()
+
+
+def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
+    title = _required_text(payload, "title")
+    price = _required_text(payload, "price")
+    engine = _required_text(payload, "engine")
+    description = _required_text(payload, "description")
+    if not all([title, price, engine, description]):
+        return None
+
+    image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
+    return [
+        title,
+        price,
+        "—",
+        "—",
+        engine,
+        "—",
+        description,
+        image_url,
+    ]
+
+
 @router.message(Command("start"))
 async def start_cmd(message: Message) -> None:
     kb = ReplyKeyboardMarkup(
@@ -302,6 +327,33 @@ async def api_car(request: web.Request) -> web.Response:
     return web.json_response(car)
 
 
+async def api_manage_car(request: web.Request) -> web.Response:
+    data = await request.json()
+    tg_id = int(data.get("tg_id", 0))
+    if not is_admin(tg_id):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+
+    fields = build_car_fields(data)
+    if fields is None:
+        return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+
+    if request.method == "POST":
+        car_id = add_car(fields)
+        return web.json_response({"ok": True, "id": car_id})
+
+    car_id = int(request.match_info["car_id"])
+    ok = edit_car(car_id, fields)
+    if not ok:
+        return web.json_response({"ok": False, "error": "not_found"}, status=404)
+    return web.json_response({"ok": True, "id": car_id})
+
+
+
+
+async def api_admin_check(request: web.Request) -> web.Response:
+    tg_id = int(request.query.get("tg_id", "0"))
+    return web.json_response({"is_admin": is_admin(tg_id)})
+
 async def api_support(request: web.Request) -> web.Response:
     data = await request.json()
     user_id = int(data.get("tg_id", 0))
@@ -328,6 +380,9 @@ async def run_web(bot: Bot) -> None:
     app.router.add_get("/car", car_page)
     app.router.add_get("/api/cars", api_cars)
     app.router.add_get("/api/cars/{car_id}", api_car)
+    app.router.add_post("/api/cars", api_manage_car)
+    app.router.add_put("/api/cars/{car_id}", api_manage_car)
+    app.router.add_get("/api/is-admin", api_admin_check)
     app.router.add_post("/api/support", api_support)
     app.router.add_static("/webapp", path="webapp", show_index=False)
 

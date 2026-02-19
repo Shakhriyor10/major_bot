@@ -443,21 +443,7 @@ async def cars_cmd(message: Message) -> None:
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
-
-    is_authorized = False
-    if message.sender_chat and message.sender_chat.id == SUPPORT_GROUP_ID:
-        is_authorized = True
-    elif message.from_user and is_admin(message.from_user.id):
-        is_authorized = True
-    elif message.from_user and not message.from_user.is_bot:
-        try:
-            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-            is_authorized = member.status in {"administrator", "creator"}
-        except TelegramAPIError:
-            # fail-open: если Telegram API временно недоступен, не блокируем ответ поддержки
-            is_authorized = True
-
-    if not is_authorized:
+    if message.from_user and message.from_user.is_bot:
         return
 
     user_id = resolve_support_user(message.reply_to_message)
@@ -466,7 +452,21 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
 
     save_support_map(message.message_id, user_id)
 
-    reply_text = (message.text or message.caption or "").strip() or "[без текста]"
+    reply_text = (message.text or message.caption or "").strip()
+    if not reply_text:
+        if message.photo:
+            reply_text = "[Фото от поддержки]"
+        elif message.video:
+            reply_text = "[Видео от поддержки]"
+        elif message.document:
+            reply_text = "[Файл от поддержки]"
+        elif message.voice:
+            reply_text = "[Голосовое сообщение от поддержки]"
+        elif message.sticker:
+            reply_text = "[Стикер от поддержки]"
+        else:
+            reply_text = "[Сообщение от поддержки]"
+
     try:
         await bot.send_message(user_id, f"🔔 Новое сообщение от поддержки\n\n{reply_text}")
     except TelegramAPIError:

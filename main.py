@@ -10,7 +10,6 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -20,7 +19,7 @@ from aiogram.types import (
 
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
-SUPPORT_GROUP_ID = int(os.getenv("SUPPORT_GROUP_ID", "0"))
+SUPPORT_GROUP_ID = 3739992037
 ADMIN_IDS = {
     int(user_id.strip())
     for user_id in os.getenv("ADMIN_IDS", "8598163827").split(",")
@@ -393,14 +392,6 @@ async def cars_cmd(message: Message) -> None:
 @router.message(F.chat.id == SUPPORT_GROUP_ID, F.reply_to_message)
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
-        return
-
-    try:
-        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-    except TelegramBadRequest:
-        return
-
-    if member.status not in {"administrator", "creator"}:
         return
 
     user_id = get_support_user(message.reply_to_message.message_id)

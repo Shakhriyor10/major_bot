@@ -444,29 +444,33 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
 
+    is_authorized = False
+    if message.sender_chat and message.sender_chat.id == SUPPORT_GROUP_ID:
+        is_authorized = True
+    elif message.from_user and is_admin(message.from_user.id):
+        is_authorized = True
+    elif message.from_user and not message.from_user.is_bot:
+        try:
+            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+            is_authorized = member.status in {"administrator", "creator"}
+        except TelegramAPIError:
+            # fail-open: если Telegram API временно недоступен, не блокируем ответ поддержки
+            is_authorized = True
+
+    if not is_authorized:
+        return
+
     user_id = resolve_support_user(message.reply_to_message)
     if not user_id:
         return
 
     save_support_map(message.message_id, user_id)
 
-    is_authorized = False
-    if message.sender_chat and message.sender_chat.id == SUPPORT_GROUP_ID:
-        is_authorized = True
-    elif message.from_user and is_admin(message.from_user.id):
-        is_authorized = True
-    elif message.from_user:
-        try:
-            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-            is_authorized = member.status in {"administrator", "creator"}
-        except TelegramAPIError:
-            is_authorized = False
-
-    if not is_authorized:
-        return
-
     reply_text = (message.text or message.caption or "").strip() or "[без текста]"
-    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
+    try:
+        await bot.send_message(user_id, f"🔔 Новое сообщение от поддержки\n\n{reply_text}")
+    except TelegramAPIError:
+        logging.exception("Failed to deliver support reply to user_id=%s", user_id)
 
 
 

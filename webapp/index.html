@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Автосалон</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/webapp/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">🚘 Автосалон Premium Drive</h1>
+      <p class="subtitle">Каталог машин и быстрая поддержка прямо в Telegram</p>
+    </header>
+
+    <section>
+      <div id="cars" class="grid"></div>
+    </section>
+
+    <section class="support-box">
+      <h2>Поддержка</h2>
+      <p class="subtitle">Опишите вопрос, и менеджер ответит вам в Telegram.</p>
+      <textarea id="supportText" placeholder="Например: Нужна помощь с выбором кроссовера до 3 млн ₽"></textarea>
+      <button id="sendSupport" class="btn">Отправить в поддержку</button>
+      <p id="status" class="subtitle"></p>
+    </section>
+  </div>
+
+  <script src="/webapp/app.js"></script>
+</body>
+</html>

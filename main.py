@@ -10,6 +10,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -393,10 +394,21 @@ async def cars_cmd(message: Message) -> None:
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
+
+    try:
+        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+    except TelegramBadRequest:
+        return
+
+    if member.status not in {"administrator", "creator"}:
+        return
+
     user_id = get_support_user(message.reply_to_message.message_id)
     if not user_id:
         return
-    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{message.text or '[без текста]'}")
+
+    reply_text = (message.text or message.caption or "").strip() or "[без текста]"
+    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
 
 
 async def app_page(_: web.Request) -> web.Response:

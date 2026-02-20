@@ -7,41 +7,56 @@ if (tg) {
 
 const params = new URLSearchParams(window.location.search);
 const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
-const adminBox = document.getElementById('adminBox');
-const menuSection = document.getElementById('menuSection');
+
+const dealershipSection = document.getElementById('dealershipSection');
+const submenuSection = document.getElementById('submenuSection');
+const selectedDealershipTitle = document.getElementById('selectedDealershipTitle');
 const carsSection = document.getElementById('carsSection');
 const supportSection = document.getElementById('supportSection');
+const locationSection = document.getElementById('locationSection');
+const adminBox = document.getElementById('adminBox');
 const adminStatus = document.getElementById('adminStatus');
 const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
 const carSearchInput = document.getElementById('carSearch');
 const brandFilterSelect = document.getElementById('brandFilter');
-const toggleLocationBtn = document.getElementById('toggleLocation');
-const locationSection = document.getElementById('locationSection');
-const closeLocationBtn = document.getElementById('closeLocation');
+const dealershipSelect = document.getElementById('dealership_id');
+const dealershipForm = document.getElementById('dealershipForm');
+const dealershipStatus = document.getElementById('dealershipStatus');
 let isAdminUser = false;
 let allCars = [];
+let dealerships = [];
+let currentDealership = null;
 
-function formatPrice(value) {
+function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
   const digits = raw.replace(/\D/g, '');
   if (!digits) return raw;
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${grouped} сум`;
+  return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
 }
 
-function showMenu() {
-  menuSection.classList.remove('hidden');
+function openDealershipList() {
+  dealershipSection.classList.remove('hidden');
+  submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
-  toggleLocationBtn.setAttribute('aria-expanded', 'false');
-  toggleLocationBtn.classList.remove('expanded');
+  currentDealership = null;
+}
+
+function openSubmenu() {
+  dealershipSection.classList.add('hidden');
+  submenuSection.classList.remove('hidden');
+  carsSection.classList.add('hidden');
+  supportSection.classList.add('hidden');
+  locationSection.classList.add('hidden');
+  adminBox.classList.add('hidden');
 }
 
 function openCars() {
-  menuSection.classList.add('hidden');
+  submenuSection.classList.add('hidden');
   carsSection.classList.remove('hidden');
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
@@ -49,7 +64,7 @@ function openCars() {
 }
 
 function openSupport() {
-  menuSection.classList.add('hidden');
+  submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.remove('hidden');
   locationSection.classList.add('hidden');
@@ -57,13 +72,44 @@ function openSupport() {
 }
 
 function openLocation() {
-  menuSection.classList.add('hidden');
+  submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.add('hidden');
-  adminBox.classList.add('hidden');
   locationSection.classList.remove('hidden');
-  toggleLocationBtn.setAttribute('aria-expanded', 'true');
-  toggleLocationBtn.classList.add('expanded');
+  adminBox.classList.add('hidden');
+}
+
+function renderDealerships() {
+  dealershipSection.innerHTML = dealerships.map((dealership) => `
+    <button class="menu-card dealership-card" data-id="${dealership.id}">
+      <img class="dealership-logo" src="${dealership.logo_url}" alt="${dealership.name}" />
+      <span class="menu-card-content">
+        <span class="menu-card-title">${dealership.name}</span>
+        <span class="menu-card-subtitle">Открыть раздел автосалона</span>
+      </span>
+    </button>
+  `).join('');
+
+  dealershipSection.querySelectorAll('.dealership-card').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const dealershipId = Number(btn.dataset.id);
+      currentDealership = dealerships.find((item) => item.id === dealershipId) || null;
+      selectedDealershipTitle.textContent = currentDealership?.name || '';
+      fillLocation();
+      await loadCars();
+      openSubmenu();
+    });
+  });
+}
+
+function fillLocation() {
+  if (!currentDealership) return;
+  document.getElementById('locationMap').src = currentDealership.map_url;
+  document.getElementById('locationAddress').textContent = currentDealership.address;
+  document.getElementById('locationPhone').textContent = `📞 ${currentDealership.phone}`;
+  document.getElementById('dealershipAddressInput').value = currentDealership.address;
+  document.getElementById('dealershipPhoneInput').value = currentDealership.phone;
+  document.getElementById('dealershipMapInput').value = currentDealership.map_url;
 }
 
 function renderBrandFilter(cars) {
@@ -95,7 +141,7 @@ function renderCars() {
       <div class="card-body">
         <h3 class="car-title">${car.title}</h3>
         <p class="specs">Марка: ${car.brand || 'Без марки'}</p>
-        <p class="price">${formatPrice(car.price)}</p>
+        <p class="price">${formatPrice(car.price, car.currency)}</p>
         <div class="specs">Объем двигателя: ${car.engine}</div>
         <button class="btn" onclick="openCar(${car.id})">Подробнее</button>
         ${isAdminUser ? `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>` : ''}
@@ -104,8 +150,23 @@ function renderCars() {
   `).join('');
 }
 
+async function loadDealerships() {
+  const res = await fetch('/api/dealerships');
+  const data = await res.json();
+  dealerships = data.dealerships || [];
+  renderDealerships();
+  dealershipSelect.innerHTML = dealerships.map((dealership) => `<option value="${dealership.id}">${dealership.name}</option>`).join('');
+}
+
 async function loadCars() {
-  const res = await fetch('/api/cars');
+  if (!currentDealership) {
+    allCars = [];
+    renderBrandFilter(allCars);
+    renderCars();
+    return;
+  }
+
+  const res = await fetch(`/api/cars?dealership_id=${currentDealership.id}`);
   const data = await res.json();
   allCars = data.cars || [];
   renderBrandFilter(allCars);
@@ -121,9 +182,11 @@ window.fillEdit = async (id) => {
   if (!res.ok) return;
   const car = await res.json();
   document.getElementById('carId').value = car.id;
+  dealershipSelect.value = String(car.dealership_id || 1);
   document.getElementById('brand').value = car.brand || '';
   document.getElementById('title').value = car.title;
   document.getElementById('price').value = car.price;
+  document.getElementById('currency').value = car.currency || 'UZS';
   document.getElementById('engine').value = car.engine;
   document.getElementById('description').value = car.description;
   document.getElementById('image_url').value = car.image_url || '';
@@ -143,9 +206,11 @@ adminForm.addEventListener('submit', async (e) => {
   const carId = document.getElementById('carId').value;
   const payload = {
     tg_id: tgId,
+    dealership_id: Number(dealershipSelect.value),
     brand: document.getElementById('brand').value.trim(),
     title: document.getElementById('title').value.trim(),
-    price: formatPrice(document.getElementById('price').value),
+    price: document.getElementById('price').value.trim(),
+    currency: document.getElementById('currency').value,
     engine: document.getElementById('engine').value.trim(),
     description: document.getElementById('description').value.trim(),
     image_url: document.getElementById('image_url').value.trim(),
@@ -170,6 +235,34 @@ adminForm.addEventListener('submit', async (e) => {
   }
 });
 
+dealershipForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentDealership) return;
+
+  const payload = {
+    tg_id: tgId,
+    id: currentDealership.id,
+    address: document.getElementById('dealershipAddressInput').value.trim(),
+    phone: document.getElementById('dealershipPhoneInput').value.trim(),
+    map_url: document.getElementById('dealershipMapInput').value.trim(),
+  };
+
+  const res = await fetch(`/api/dealerships/${currentDealership.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (res.ok) {
+    dealershipStatus.textContent = '✅ Контакты автосалона обновлены';
+    await loadDealerships();
+    currentDealership = dealerships.find((item) => item.id === payload.id) || currentDealership;
+    fillLocation();
+  } else {
+    dealershipStatus.textContent = '❌ Не удалось обновить контакты';
+  }
+});
+
 document.getElementById('sendSupport').addEventListener('click', async () => {
   const text = document.getElementById('supportText').value.trim();
   const status = document.getElementById('status');
@@ -181,7 +274,7 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
   const res = await fetch('/api/support', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tg_id: tgId, message: text })
+    body: JSON.stringify({ tg_id: tgId, message: text, dealership_name: currentDealership?.name || '' }),
   });
 
   if (res.ok) {
@@ -192,28 +285,22 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
   }
 });
 
-
-
-toggleLocationBtn.addEventListener('click', () => {
-  openLocation();
-});
-
-closeLocationBtn.addEventListener('click', () => {
-  showMenu();
-});
-
 document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.target === 'carsSection') {
       openCars();
+    } else if (btn.dataset.target === 'locationSection') {
+      openLocation();
     } else {
       openSupport();
     }
   });
 });
 
-document.getElementById('backToMenuFromCars').addEventListener('click', showMenu);
-document.getElementById('backToMenuFromSupport').addEventListener('click', showMenu);
+document.getElementById('backToDealerships').addEventListener('click', openDealershipList);
+document.getElementById('backToSubmenuFromCars').addEventListener('click', openSubmenu);
+document.getElementById('backToSubmenuFromSupport').addEventListener('click', openSubmenu);
+document.getElementById('backToSubmenuFromLocation').addEventListener('click', openSubmenu);
 carSearchInput.addEventListener('input', renderCars);
 brandFilterSelect.addEventListener('change', renderCars);
 
@@ -223,6 +310,11 @@ brandFilterSelect.addEventListener('change', renderCars);
     const data = await adminCheck.json();
     isAdminUser = Boolean(data.is_admin);
   }
-  showMenu();
-  await loadCars();
+
+  if (isAdminUser) {
+    dealershipForm.classList.remove('hidden');
+  }
+
+  await loadDealerships();
+  openDealershipList();
 })();

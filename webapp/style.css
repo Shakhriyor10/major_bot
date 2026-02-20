@@ -127,6 +127,15 @@ textarea, input {
   color: var(--tg-text);
   margin: 8px 0 12px;
 }
+select {
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--tg-text);
+  margin: 8px 0 12px;
+}
 textarea { min-height: 90px; }
 .back { margin-bottom: 12px; display: inline-block; color: var(--tg-button); }
 .feature-list { list-style: none; padding: 0; margin: 12px 0; }
@@ -262,4 +271,13 @@ textarea { min-height: 90px; }
 
 #locationSection h2 {
   margin: 0 0 8px;
+}
+
+.dealership-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  padding: 4px;
 }

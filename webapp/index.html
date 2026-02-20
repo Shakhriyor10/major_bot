@@ -10,63 +10,56 @@
 <body>
   <div class="container">
     <header class="header">
-      <h1 class="title">🚘 Автосалон Premium Drive</h1>
-      <p class="subtitle">Красивый каталог машин и быстрая поддержка прямо в Telegram</p>
+      <h1 class="title">🚘 Автосалоны</h1>
+      <p class="subtitle">Выберите автосалон, чтобы посмотреть автомобили, контакты и поддержку.</p>
     </header>
 
-    <section id="menuSection" class="menu-grid">
-      <button class="menu-card" data-target="carsSection">
-        <span class="menu-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img" focusable="false">
-            <path d="M5 11l1.5-4.2A3 3 0 0 1 9.34 5h5.32a3 3 0 0 1 2.84 1.8L19 11h1a2 2 0 0 1 2 2v3h-1a2.5 2.5 0 0 1-5 0h-8a2.5 2.5 0 0 1-5 0H2v-3a2 2 0 0 1 2-2h1zm2.2 0h9.6l-1.2-3.3a1 1 0 0 0-.95-.7H9.34a1 1 0 0 0-.95.7L7.2 11zM7 17.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm10 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
-          </svg>
-        </span>
-        <span class="menu-card-content">
-          <span class="menu-card-title">Автомобили</span>
-          <span class="menu-card-subtitle">Каталог доступных машин</span>
-        </span>
-      </button>
-      <button class="menu-card" data-target="supportSection">
-        <span class="menu-card-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img" focusable="false">
-            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm6.9 8h-3.24a3.98 3.98 0 0 0-1.66-1.66V5.1A8.02 8.02 0 0 1 18.9 10zM10 5.1v3.24A3.98 3.98 0 0 0 8.34 10H5.1A8.02 8.02 0 0 1 10 5.1zM5.1 14h3.24A3.98 3.98 0 0 0 10 15.66v3.24A8.02 8.02 0 0 1 5.1 14zM12 14a2 2 0 1 1 2-2 2 2 0 0 1-2 2zm2 4.9v-3.24A3.98 3.98 0 0 0 15.66 14h3.24A8.02 8.02 0 0 1 14 18.9z"/>
-          </svg>
-        </span>
-        <span class="menu-card-content">
-          <span class="menu-card-title">Поддержка</span>
-          <span class="menu-card-subtitle">Оставьте вопрос менеджеру</span>
-        </span>
-      </button>
-      <button id="toggleLocation" class="menu-card menu-card-address" type="button" aria-expanded="false">
-        <span class="menu-card-icon" aria-hidden="true">📍</span>
-        <span class="menu-card-content">
-          <span class="menu-card-title">Адрес и контакты</span>
-          <span class="address-hint">Нажмите, чтобы открыть карту и контакты</span>
-        </span>
-      </button>
-    </section>
+    <section id="dealershipSection" class="menu-grid"></section>
 
-
-
-    <section id="locationSection" class="support-box hidden">
-      <button id="closeLocation" class="back-btn">← Скрыть расположение</button>
-      <h2>Адрес и контакты</h2>
-      <iframe
-        class="map-frame"
-        title="Карта автосалона"
-        loading="lazy"
-        src="https://www.openstreetmap.org/export/embed.html?bbox=66.968155%2C39.667412%2C66.988155%2C39.687412&layer=mapnik&marker=39.677412%2C66.978155"
-      ></iframe>
-      <p class="subtitle location-address">г. Самарканд, ул. Ибн Сины, 25</p>
-      <p class="location-phone">📞 +998-77-101-00-53</p>
-      <div class="social-links" aria-label="Соцсети">
-        <a class="social-icon" href="https://instagram.com" target="_blank" rel="noopener noreferrer">📷 Instagram</a>
-        <a class="social-icon" href="https://t.me" target="_blank" rel="noopener noreferrer">✈️ Telegram</a>
+    <section id="submenuSection" class="hidden">
+      <button id="backToDealerships" class="back-btn">← Назад к автосалонам</button>
+      <h2 id="selectedDealershipTitle"></h2>
+      <div class="menu-grid">
+        <button class="menu-card" data-target="carsSection">
+          <span class="menu-card-content">
+            <span class="menu-card-title">Автомобили</span>
+            <span class="menu-card-subtitle">Каталог выбранного автосалона</span>
+          </span>
+        </button>
+        <button class="menu-card" data-target="locationSection">
+          <span class="menu-card-content">
+            <span class="menu-card-title">Адрес и контакты</span>
+            <span class="menu-card-subtitle">Контакты выбранного автосалона</span>
+          </span>
+        </button>
+        <button class="menu-card" data-target="supportSection">
+          <span class="menu-card-content">
+            <span class="menu-card-title">Поддержка</span>
+            <span class="menu-card-subtitle">Связаться с менеджером</span>
+          </span>
+        </button>
       </div>
     </section>
 
+    <section id="locationSection" class="support-box hidden">
+      <button id="backToSubmenuFromLocation" class="back-btn">← Назад</button>
+      <h2>Адрес и контакты</h2>
+      <iframe id="locationMap" class="map-frame" title="Карта автосалона" loading="lazy"></iframe>
+      <p id="locationAddress" class="subtitle location-address"></p>
+      <p id="locationPhone" class="location-phone"></p>
+
+      <form id="dealershipForm" class="admin-form hidden">
+        <h3>Редактирование контактов автосалона</h3>
+        <input id="dealershipAddressInput" placeholder="Адрес" required />
+        <input id="dealershipPhoneInput" placeholder="Телефон" required />
+        <input id="dealershipMapInput" placeholder="Ссылка на карту" required />
+        <button type="submit" class="btn">Сохранить контакты</button>
+      </form>
+      <p id="dealershipStatus" class="subtitle"></p>
+    </section>
+
     <section id="carsSection" class="hidden">
-      <button id="backToMenuFromCars" class="back-btn">← Назад к выбору</button>
+      <button id="backToSubmenuFromCars" class="back-btn">← Назад</button>
       <div class="filters-box">
         <div class="filter-item filter-item-search">
           <label for="carSearch">Поиск</label>
@@ -86,12 +79,17 @@
 
     <section id="adminBox" class="support-box hidden">
       <h2>Панель администратора</h2>
-      <p class="subtitle">Добавление и редактирование машины: Марка, Название, Цена, Объем двигателя, Описание.</p>
+      <p class="subtitle">Добавление и редактирование автомобиля с выбором автосалона и валюты.</p>
       <form id="adminForm" class="admin-form">
         <input type="hidden" id="carId" />
+        <select id="dealership_id" required></select>
         <input id="brand" placeholder="Марка автомобиля" required />
         <input id="title" placeholder="Название" required />
-        <input id="price" placeholder="Цена" required />
+        <input id="price" placeholder="Цена (число)" required />
+        <select id="currency" required>
+          <option value="UZS">Сум (UZS)</option>
+          <option value="USD">Доллар (USD)</option>
+        </select>
         <input id="engine" placeholder="Объем двигателя" required />
         <textarea id="description" placeholder="Описание" required></textarea>
         <input id="image_url" placeholder="Ссылка на фото (необязательно)" />
@@ -104,10 +102,10 @@
     </section>
 
     <section id="supportSection" class="support-box hidden">
-      <button id="backToMenuFromSupport" class="back-btn">← Назад к выбору</button>
+      <button id="backToSubmenuFromSupport" class="back-btn">← Назад</button>
       <h2>Поддержка</h2>
       <p class="subtitle">Опишите вопрос, и менеджер ответит вам в Telegram.</p>
-      <textarea id="supportText" placeholder="Например: Нужна помощь с выбором кроссовера до 3 млн ₽"></textarea>
+      <textarea id="supportText" placeholder="Например: Нужна помощь с выбором кроссовера"></textarea>
       <button id="sendSupport" class="btn">Отправить в поддержку</button>
       <p id="status" class="subtitle"></p>
     </section>

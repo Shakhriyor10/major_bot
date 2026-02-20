@@ -140,7 +140,8 @@ function applySocialLink(anchor, url) {
 }
 
 function updateSocialBar() {
-  if (!currentDealership) {
+  const isDealershipSelectionVisible = !dealershipSection.classList.contains('hidden');
+  if (!currentDealership || isDealershipSelectionVisible) {
     socialBar.classList.add('hidden');
     return;
   }

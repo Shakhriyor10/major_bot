@@ -50,6 +50,11 @@ body {
   transform: translateY(-1px);
   border-color: var(--tg-button);
 }
+.menu-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .menu-card-icon {
   width: 24px;
   height: 24px;

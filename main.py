@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime
 from typing import Any
@@ -212,12 +213,28 @@ def get_support_user(group_message_id: int) -> int | None:
     return int(row[0]) if row else None
 
 
+def extract_user_id_from_support_message(message: Message) -> int | None:
+    content = (message.text or message.caption or "").strip()
+    if not content:
+        return None
+
+    match = re.search(r"\bID:\s*(\d+)\b", content)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
 def resolve_support_user(message: Message) -> int | None:
     current = message.reply_to_message
     while current:
         user_id = get_support_user(current.message_id)
         if user_id:
             return user_id
+
+        parsed_user_id = extract_user_id_from_support_message(current)
+        if parsed_user_id:
+            return parsed_user_id
+
         current = current.reply_to_message
     return None
 

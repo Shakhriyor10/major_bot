@@ -26,6 +26,7 @@ const dealershipForm = document.getElementById('dealershipForm');
 const dealershipStatus = document.getElementById('dealershipStatus');
 const splashScreen = document.getElementById('appSplash');
 const splashStartedAt = Date.now();
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let isAdminUser = false;
 let allCars = [];
@@ -35,7 +36,8 @@ let currentDealership = null;
 function hideSplashScreen() {
   if (!splashScreen) return;
   const elapsed = Date.now() - splashStartedAt;
-  const delay = Math.max(0, 1500 - elapsed);
+  const minDuration = prefersReducedMotion ? 200 : 1300;
+  const delay = Math.max(0, minDuration - elapsed);
 
   window.setTimeout(() => {
     splashScreen.classList.add('hidden');
@@ -341,17 +343,20 @@ carSearchInput.addEventListener('input', renderCars);
 brandFilterSelect.addEventListener('change', renderCars);
 
 (async () => {
-  const adminCheck = await fetch(`/api/is-admin?tg_id=${tgId}`);
-  if (adminCheck.ok) {
-    const data = await adminCheck.json();
-    isAdminUser = Boolean(data.is_admin);
-  }
+  try {
+    const adminCheck = await fetch(`/api/is-admin?tg_id=${tgId}`);
+    if (adminCheck.ok) {
+      const data = await adminCheck.json();
+      isAdminUser = Boolean(data.is_admin);
+    }
 
-  if (isAdminUser) {
-    dealershipForm.classList.remove('hidden');
-  }
+    if (isAdminUser) {
+      dealershipForm.classList.remove('hidden');
+    }
 
-  await loadDealerships();
-  openDealershipList();
-  hideSplashScreen();
+    await loadDealerships();
+    openDealershipList();
+  } finally {
+    hideSplashScreen();
+  }
 })();

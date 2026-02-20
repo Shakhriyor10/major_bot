@@ -27,8 +27,10 @@ body {
   z-index: 999;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at top, color-mix(in srgb, var(--tg-button) 22%, var(--tg-bg)), var(--tg-bg) 68%);
-  transition: opacity 0.5s ease, visibility 0.5s ease;
+  padding: 20px;
+  background: color-mix(in srgb, var(--tg-bg) 86%, #000 14%);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.45s ease, visibility 0.45s ease;
 }
 
 .app-splash.hidden {
@@ -38,68 +40,66 @@ body {
 }
 
 .app-splash-inner {
+  width: min(320px, 92vw);
   text-align: center;
-  padding: 24px;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--tg-bg) 82%, var(--tg-button) 18%);
+  border: 1px solid color-mix(in srgb, var(--line) 75%, var(--tg-button) 25%);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
 }
 
 .app-splash-title {
-  margin: 0 0 16px;
-  font-size: 28px;
+  margin: 0 0 10px;
+  font-size: 18px;
   font-weight: 800;
 }
 
 .app-splash-subtitle {
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: var(--tg-hint);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .app-splash-logos {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 10px;
 }
 
 .app-splash-logo {
-  width: 72px;
-  height: 72px;
+  width: 54px;
+  height: 54px;
   object-fit: contain;
   background: #fff;
-  border-radius: 16px;
-  padding: 6px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
-  opacity: 0;
-  transform: translateY(16px) scale(0.9);
-  animation: splashLogo 2.6s ease-in-out infinite;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  opacity: 0.22;
+  transform: translateY(8px) scale(0.96);
+  animation: splashLogo 1.5s ease-in-out infinite;
 }
 
-.app-splash-logo-major {
-  animation-delay: 0s;
-}
-
-.app-splash-logo-autocenter {
-  animation-delay: 0.25s;
-}
-
-.app-splash-logo-shineray {
-  animation-delay: 0.5s;
-}
+.app-splash-logo-major { animation-delay: 0s; }
+.app-splash-logo-autocenter { animation-delay: 0.2s; }
+.app-splash-logo-shineray { animation-delay: 0.4s; }
 
 @keyframes splashLogo {
   0%,
   100% {
-    opacity: 0;
-    transform: translateY(16px) scale(0.9);
+    opacity: 0.3;
+    transform: translateY(8px) scale(0.95);
   }
-  20%,
-  70% {
+  35% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-  45% {
-    transform: translateY(-3px) scale(1.04);
+  55% {
+    opacity: 0.9;
+    transform: translateY(-2px) scale(1.03);
   }
 }
 

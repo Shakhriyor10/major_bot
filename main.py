@@ -670,17 +670,14 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not user_id:
         return
 
+    support_text = extract_support_reply_text(message)
     try:
-        await bot.copy_message(
-            chat_id=user_id,
-            from_chat_id=message.chat.id,
-            message_id=message.message_id,
-            reply_markup=None,
-        )
-    except TelegramBadRequest:
-        await bot.send_message(user_id, f"🔔 Новое сообщение от поддержки\n\n{extract_support_reply_text(message)}")
+        await bot.send_message(user_id, f"Сообщение от поддержки:\n{support_text}")
     except TelegramForbiddenError:
         logging.warning("Не удалось отправить ответ поддержки пользователю %s: бот заблокирован", user_id)
+        return
+    except TelegramBadRequest:
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: некорректный формат сообщения", user_id)
         return
 
     save_support_map(message.message_id, user_id)

@@ -52,28 +52,20 @@ function normalizeExternalUrl(rawUrl) {
   return `https://${value}`;
 }
 
-function renderVideoBlock(car) {
+function renderCardMedia(car) {
   const videoUrl = normalizeExternalUrl(car.video_url);
-  if (!videoUrl) return '';
+  if (!videoUrl) {
+    return `<img src="${car.image_url}" alt="${car.title}" />`;
+  }
 
   const embedUrl = getYoutubeEmbedUrl(videoUrl);
   if (embedUrl) {
     return `
-      <section class="description-box">
-        <h2 class="description-title">Видео обзор</h2>
-        <div id="videoPlayerContainer">
-          <iframe src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
-        </div>
-      </section>
+      <iframe class="car-media-frame" src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
     `;
   }
 
-  return `
-    <section class="description-box">
-      <h2 class="description-title">Видео обзор</h2>
-      <a class="btn" href="${videoUrl}" target="_blank" rel="noopener noreferrer">Открыть видео</a>
-    </section>
-  `;
+  return `<img src="${car.image_url}" alt="${car.title}" />`;
 }
 
 async function loadCar() {
@@ -93,7 +85,7 @@ async function loadCar() {
   root.innerHTML = `
     <a href="/app?tg_id=${tgId}" class="back">← Назад к каталогу</a>
     <article class="card">
-      <img src="${car.image_url}" alt="${car.title}" />
+      ${renderCardMedia(car)}
       <div class="card-body">
         <h1 class="car-title">${car.title}</h1>
         <p class="price">${formatPrice(car.price, car.currency)}</p>
@@ -108,7 +100,6 @@ async function loadCar() {
       <h2 class="description-title">Подробное описание</h2>
       <p class="description-text">${car.description}</p>
     </section>
-    ${renderVideoBlock(car)}
   `;
 
 }

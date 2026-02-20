@@ -182,6 +182,12 @@ body.app-ready .container {
   backdrop-filter: blur(4px);
 }
 .card img { width: 100%; height: 170px; object-fit: cover; }
+.car-media-frame {
+  width: 100%;
+  height: 170px;
+  border: none;
+  display: block;
+}
 .card-body { padding: 12px; }
 .car-title { margin: 0 0 4px; font-size: 20px; }
 .price { margin: 0 0 8px; color: var(--tg-button); font-weight: 700; }

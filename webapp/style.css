@@ -73,18 +73,17 @@ body.app-ready .container {
   opacity: 0;
   will-change: transform, opacity;
   backface-visibility: hidden;
-  animation: logo-sequence 1.35s cubic-bezier(0.24, 0.72, 0.24, 1) forwards;
+  animation: logo-sequence 0.9s cubic-bezier(0.32, 0.02, 0.2, 1) forwards;
 }
 
-.startup-logo-2 { animation-delay: 1.3s; }
-.startup-logo-3 { animation-delay: 2.6s; }
+.startup-logo-2 { animation-delay: 0.85s; }
+.startup-logo-3 { animation-delay: 1.7s; }
 
 @keyframes logo-sequence {
-  0% { opacity: 0; transform: translate3d(-50%, -50%, 0) scale(0.94); }
-  22% { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1); }
-  58% { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1.04); }
-  86% { opacity: 0.85; transform: translate3d(-50%, -50%, 0) scale(1); }
-  100% { opacity: 0; transform: translate3d(-50%, -50%, 0) scale(0.97); }
+  0% { opacity: 0; transform: translate3d(-50%, -50%, 0) scale(0.97); }
+  24% { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1); }
+  64% { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1.02); }
+  100% { opacity: 0; transform: translate3d(-50%, -50%, 0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {

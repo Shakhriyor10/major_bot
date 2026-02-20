@@ -391,6 +391,12 @@ textarea { min-height: 90px; }
   pointer-events: none;
   opacity: 0.45;
 }
+
+.social-bar.hidden,
+.social-link.hidden {
+  display: none;
+}
+
 @media (max-width: 700px) {
   .filters-box {
     grid-template-columns: 1fr;

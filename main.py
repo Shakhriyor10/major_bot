@@ -212,6 +212,16 @@ def get_support_user(group_message_id: int) -> int | None:
     return int(row[0]) if row else None
 
 
+def resolve_support_user(message: Message) -> int | None:
+    current = message.reply_to_message
+    while current:
+        user_id = get_support_user(current.message_id)
+        if user_id:
+            return user_id
+        current = current.reply_to_message
+    return None
+
+
 def get_user_display(user_id: int) -> str:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -449,12 +459,13 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if member.status not in {"administrator", "creator"}:
         return
 
-    user_id = get_support_user(message.reply_to_message.message_id)
+    user_id = resolve_support_user(message)
     if not user_id:
         return
 
     reply_text = (message.text or message.caption or "").strip() or "[без текста]"
-    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
+    await bot.send_message(user_id, f"🔔 Сообщение от поддержки:\n{reply_text}")
+    save_support_map(message.message_id, user_id)
 
 
 async def app_page(_: web.Request) -> web.Response:

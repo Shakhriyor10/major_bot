@@ -24,10 +24,23 @@ const brandFilterSelect = document.getElementById('brandFilter');
 const dealershipSelect = document.getElementById('dealership_id');
 const dealershipForm = document.getElementById('dealershipForm');
 const dealershipStatus = document.getElementById('dealershipStatus');
+const splashScreen = document.getElementById('appSplash');
+const splashStartedAt = Date.now();
+
 let isAdminUser = false;
 let allCars = [];
 let dealerships = [];
 let currentDealership = null;
+
+function hideSplashScreen() {
+  if (!splashScreen) return;
+  const elapsed = Date.now() - splashStartedAt;
+  const delay = Math.max(0, 1500 - elapsed);
+
+  window.setTimeout(() => {
+    splashScreen.classList.add('hidden');
+  }, delay);
+}
 
 function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
@@ -340,4 +353,5 @@ brandFilterSelect.addEventListener('change', renderCars);
 
   await loadDealerships();
   openDealershipList();
+  hideSplashScreen();
 })();

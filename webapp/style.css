@@ -20,6 +20,89 @@ body {
   background: var(--tg-bg);
   color: var(--tg-text);
 }
+
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at top, color-mix(in srgb, var(--tg-button) 22%, var(--tg-bg)), var(--tg-bg) 68%);
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.app-splash.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.app-splash-inner {
+  text-align: center;
+  padding: 24px;
+}
+
+.app-splash-title {
+  margin: 0 0 16px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.app-splash-subtitle {
+  margin: 18px 0 0;
+  color: var(--tg-hint);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.app-splash-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.app-splash-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  animation: splashLogo 2.6s ease-in-out infinite;
+}
+
+.app-splash-logo-major {
+  animation-delay: 0s;
+}
+
+.app-splash-logo-autocenter {
+  animation-delay: 0.25s;
+}
+
+.app-splash-logo-shineray {
+  animation-delay: 0.5s;
+}
+
+@keyframes splashLogo {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.9);
+  }
+  20%,
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-3px) scale(1.04);
+  }
+}
+
 .container { max-width: 980px; margin: 0 auto; padding: 18px; }
 .header { margin-bottom: 18px; }
 .title {

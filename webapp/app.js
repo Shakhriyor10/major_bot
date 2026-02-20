@@ -10,7 +10,8 @@ const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
 
 const dealershipSection = document.getElementById('dealershipSection');
 const submenuSection = document.getElementById('submenuSection');
-const selectedDealershipTitle = document.getElementById('selectedDealershipTitle');
+const pageTitleText = document.getElementById('pageTitleText');
+const pageTitleLogo = document.getElementById('pageTitleLogo');
 const carsSection = document.getElementById('carsSection');
 const supportSection = document.getElementById('supportSection');
 const locationSection = document.getElementById('locationSection');
@@ -44,6 +45,7 @@ function openDealershipList() {
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   currentDealership = null;
+  updateHeaderTitle();
 }
 
 function openSubmenu() {
@@ -94,12 +96,31 @@ function renderDealerships() {
     btn.addEventListener('click', async () => {
       const dealershipId = Number(btn.dataset.id);
       currentDealership = dealerships.find((item) => item.id === dealershipId) || null;
-      selectedDealershipTitle.textContent = currentDealership?.name || '';
+      updateHeaderTitle();
       fillLocation();
       await loadCars();
       openSubmenu();
     });
   });
+}
+
+function updateHeaderTitle() {
+  if (!currentDealership) {
+    pageTitleText.textContent = 'Автосалоны';
+    pageTitleLogo.src = '';
+    pageTitleLogo.classList.add('hidden');
+    return;
+  }
+
+  pageTitleText.textContent = currentDealership.name || 'Автосалон';
+  if (currentDealership.logo_url) {
+    pageTitleLogo.src = currentDealership.logo_url;
+    pageTitleLogo.alt = `Логотип ${currentDealership.name || 'автосалона'}`;
+    pageTitleLogo.classList.remove('hidden');
+  } else {
+    pageTitleLogo.src = '';
+    pageTitleLogo.classList.add('hidden');
+  }
 }
 
 function fillLocation() {

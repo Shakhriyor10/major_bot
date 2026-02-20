@@ -33,6 +33,7 @@ DB_PATH = "dealership.db"
 router = Router()
 
 ADD_CAR_STEPS = [
+    ("brand", "Введите марку автомобиля (например: BMW):"),
     ("title", "Введите название автомобиля (например: BMW X5 2022):"),
     ("price", "Введите цену (например: 5 900 000 ₽):"),
     ("year", "Введите год выпуска (например: 2022):"),
@@ -64,6 +65,7 @@ def init_db() -> None:
         """
         CREATE TABLE IF NOT EXISTS cars (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand TEXT NOT NULL,
             title TEXT NOT NULL,
             price TEXT NOT NULL,
             year TEXT NOT NULL,
@@ -76,6 +78,9 @@ def init_db() -> None:
         )
         """
     )
+    columns = {row[1] for row in cur.execute("PRAGMA table_info(cars)")}
+    if "brand" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN brand TEXT NOT NULL DEFAULT 'Без марки'")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS support_threads (
@@ -155,8 +160,8 @@ def add_car(fields: list[str]) -> int:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO cars (title, price, year, mileage, engine, transmission, description, image_url, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cars (brand, title, price, year, mileage, engine, transmission, description, image_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -172,7 +177,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET title=?, price=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?
+        SET brand=?, title=?, price=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -265,15 +270,17 @@ def _required_text(payload: dict[str, Any], key: str) -> str:
 
 
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
+    brand = _required_text(payload, "brand")
     title = _required_text(payload, "title")
     price = _required_text(payload, "price")
     engine = _required_text(payload, "engine")
     description = _required_text(payload, "description")
-    if not all([title, price, engine, description]):
+    if not all([brand, title, price, engine, description]):
         return None
 
     image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
     return [
+        brand,
         title,
         price,
         "—",
@@ -337,9 +344,9 @@ async def addcar_cmd(message: Message) -> None:
     payload = (message.text or "").replace("/addcar", "", 1).strip()
     if payload:
         parts = [p.strip() for p in payload.split("|")]
-        if len(parts) != 8:
+        if len(parts) != 9:
             await message.answer(
-                "Формат:\n/addcar title | price | year | mileage | engine | transmission | description | image_url"
+                "Формат:\n/addcar brand | title | price | year | mileage | engine | transmission | description | image_url"
             )
             return
         car_id = add_car(parts)
@@ -410,6 +417,7 @@ async def addcar_step_handler(message: Message) -> None:
         return
 
     fields = [
+        draft["brand"],
         draft["title"],
         draft["price"],
         draft["year"],
@@ -430,9 +438,9 @@ async def editcar_cmd(message: Message) -> None:
         return
     payload = message.text.replace("/editcar", "", 1).strip()
     parts = [p.strip() for p in payload.split("|")]
-    if len(parts) != 9 or not parts[0].isdigit():
+    if len(parts) != 10 or not parts[0].isdigit():
         await message.answer(
-            "Формат:\n/editcar id | title | price | year | mileage | engine | transmission | description | image_url"
+            "Формат:\n/editcar id | brand | title | price | year | mileage | engine | transmission | description | image_url"
         )
         return
     ok = edit_car(int(parts[0]), parts[1:])

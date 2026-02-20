@@ -14,7 +14,10 @@ const supportSection = document.getElementById('supportSection');
 const adminStatus = document.getElementById('adminStatus');
 const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
+const carSearchInput = document.getElementById('carSearch');
+const brandFilterSelect = document.getElementById('brandFilter');
 let isAdminUser = false;
+let allCars = [];
 
 function formatPrice(value) {
   const raw = String(value ?? '').trim();
@@ -26,6 +29,7 @@ function formatPrice(value) {
 
 function showMenu() {
   menuSection.classList.remove('hidden');
+  document.getElementById('locationSection').classList.remove('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -33,6 +37,7 @@ function showMenu() {
 
 function openCars() {
   menuSection.classList.add('hidden');
+  document.getElementById('locationSection').classList.add('hidden');
   carsSection.classList.remove('hidden');
   supportSection.classList.add('hidden');
   if (isAdminUser) adminBox.classList.remove('hidden');
@@ -40,26 +45,41 @@ function openCars() {
 
 function openSupport() {
   menuSection.classList.add('hidden');
+  document.getElementById('locationSection').classList.add('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.remove('hidden');
   adminBox.classList.add('hidden');
 }
 
-async function loadCars() {
-  const res = await fetch('/api/cars');
-  const data = await res.json();
-  const root = document.getElementById('cars');
+function renderBrandFilter(cars) {
+  const brands = [...new Set(cars.map((car) => (car.brand || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  brandFilterSelect.innerHTML = '<option value="">Все марки</option>' + brands.map((brand) => `<option value="${brand}">${brand}</option>`).join('');
+}
 
-  if (!data.cars?.length) {
-    root.innerHTML = '<p class="subtitle">Пока нет добавленных автомобилей.</p>';
+function renderCars() {
+  const root = document.getElementById('cars');
+  const query = (carSearchInput.value || '').trim().toLowerCase();
+  const selectedBrand = brandFilterSelect.value;
+
+  const filteredCars = allCars.filter((car) => {
+    const brand = (car.brand || '').trim();
+    const title = (car.title || '').trim();
+    const matchBrand = selectedBrand ? brand === selectedBrand : true;
+    const matchQuery = !query || brand.toLowerCase().includes(query) || title.toLowerCase().includes(query);
+    return matchBrand && matchQuery;
+  });
+
+  if (!filteredCars.length) {
+    root.innerHTML = '<p class="subtitle">Ничего не найдено по заданным фильтрам.</p>';
     return;
   }
 
-  root.innerHTML = data.cars.map((car) => `
+  root.innerHTML = filteredCars.map((car) => `
     <article class="card">
       <img src="${car.image_url}" alt="${car.title}" />
       <div class="card-body">
         <h3 class="car-title">${car.title}</h3>
+        <p class="specs">Марка: ${car.brand || 'Без марки'}</p>
         <p class="price">${formatPrice(car.price)}</p>
         <div class="specs">Объем двигателя: ${car.engine}</div>
         <button class="btn" onclick="openCar(${car.id})">Подробнее</button>
@@ -67,6 +87,14 @@ async function loadCars() {
       </div>
     </article>
   `).join('');
+}
+
+async function loadCars() {
+  const res = await fetch('/api/cars');
+  const data = await res.json();
+  allCars = data.cars || [];
+  renderBrandFilter(allCars);
+  renderCars();
 }
 
 window.openCar = (id) => {
@@ -78,6 +106,7 @@ window.fillEdit = async (id) => {
   if (!res.ok) return;
   const car = await res.json();
   document.getElementById('carId').value = car.id;
+  document.getElementById('brand').value = car.brand || '';
   document.getElementById('title').value = car.title;
   document.getElementById('price').value = car.price;
   document.getElementById('engine').value = car.engine;
@@ -99,6 +128,7 @@ adminForm.addEventListener('submit', async (e) => {
   const carId = document.getElementById('carId').value;
   const payload = {
     tg_id: tgId,
+    brand: document.getElementById('brand').value.trim(),
     title: document.getElementById('title').value.trim(),
     price: formatPrice(document.getElementById('price').value),
     engine: document.getElementById('engine').value.trim(),
@@ -147,7 +177,7 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
   }
 });
 
-document.querySelectorAll('.menu-card').forEach((btn) => {
+document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.target === 'carsSection') {
       openCars();
@@ -159,6 +189,8 @@ document.querySelectorAll('.menu-card').forEach((btn) => {
 
 document.getElementById('backToMenuFromCars').addEventListener('click', showMenu);
 document.getElementById('backToMenuFromSupport').addEventListener('click', showMenu);
+carSearchInput.addEventListener('input', renderCars);
+brandFilterSelect.addEventListener('change', renderCars);
 
 (async () => {
   const adminCheck = await fetch(`/api/is-admin?tg_id=${tgId}`);

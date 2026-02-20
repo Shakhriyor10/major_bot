@@ -7,6 +7,14 @@ if (tg) {
 const params = new URLSearchParams(window.location.search);
 const carId = Number(params.get('id'));
 
+function formatPrice(value) {
+  const raw = String(value ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return raw;
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return `${grouped} сум`;
+}
+
 async function loadCar() {
   const root = document.getElementById('carPage');
   if (!carId) {
@@ -27,13 +35,16 @@ async function loadCar() {
       <img src="${car.image_url}" alt="${car.title}" />
       <div class="card-body">
         <h1 class="car-title">${car.title}</h1>
-        <p class="price">${car.price}</p>
+        <p class="price">${formatPrice(car.price)}</p>
         <ul class="feature-list">
           <li><b>Объем двигателя:</b> ${car.engine}</li>
         </ul>
-        <p>${car.description}</p>
       </div>
     </article>
+    <section class="description-box">
+      <h2 class="description-title">Подробное описание</h2>
+      <p class="description-text">${car.description}</p>
+    </section>
   `;
 }
 

@@ -669,16 +669,32 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     user_id = resolve_support_user(message)
     if not user_id:
         return
-
-    support_text = extract_support_reply_text(message)
     try:
-        await bot.send_message(user_id, f"Сообщение от поддержки:\n{support_text}")
+        await bot.send_message(user_id, "Сообщение от поддержки:")
     except TelegramForbiddenError:
         logging.warning("Не удалось отправить ответ поддержки пользователю %s: бот заблокирован", user_id)
         return
     except TelegramBadRequest:
-        logging.warning("Не удалось отправить ответ поддержки пользователю %s: некорректный формат сообщения", user_id)
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: не удалось отправить префикс", user_id)
         return
+
+    try:
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=message.chat.id,
+            message_id=message.message_id,
+            reply_markup=None,
+        )
+    except TelegramForbiddenError:
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: бот заблокирован", user_id)
+        return
+    except TelegramBadRequest:
+        support_text = extract_support_reply_text(message)
+        try:
+            await bot.send_message(user_id, support_text)
+        except (TelegramForbiddenError, TelegramBadRequest):
+            logging.warning("Не удалось доставить fallback ответ поддержки пользователю %s", user_id)
+            return
 
     save_support_map(message.message_id, user_id)
 

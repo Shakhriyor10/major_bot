@@ -33,9 +33,11 @@ DB_PATH = "dealership.db"
 router = Router()
 
 ADD_CAR_STEPS = [
+    ("dealership", "Введите автосалон (ID, slug или название):"),
     ("brand", "Введите марку автомобиля (например: BMW):"),
     ("title", "Введите название автомобиля (например: BMW X5 2022):"),
-    ("price", "Введите цену (например: 5 900 000 ₽):"),
+    ("price", "Введите цену (только число, например: 59000):"),
+    ("currency", "Введите валюту цены (USD или UZS):"),
     ("year", "Введите год выпуска (например: 2022):"),
     ("mileage", "Введите пробег (например: 45 000 км):"),
     ("engine", "Введите двигатель (например: 3.0 л, 340 л.с.):"),
@@ -44,6 +46,33 @@ ADD_CAR_STEPS = [
     ("image_url", "Введите ссылку на фото (или отправьте '-' чтобы использовать стандартное изображение):"),
 ]
 ADMIN_CAR_DRAFTS: dict[int, dict[str, str]] = {}
+
+DEFAULT_DEALERSHIPS = [
+    {
+        "slug": "major-motors",
+        "name": "Major motors",
+        "logo": "/webapp/image/major_logo.png",
+        "address": "г. Самарканд, ул. Ибн Сины, 25",
+        "phone": "+998-77-101-00-53",
+        "map_url": "https://www.openstreetmap.org/export/embed.html?bbox=66.968155%2C39.667412%2C66.988155%2C39.687412&layer=mapnik&marker=39.677412%2C66.978155",
+    },
+    {
+        "slug": "autocenter-samarkand",
+        "name": "Autocenter Samarkand",
+        "logo": "/webapp/image/autocenter_logo.png",
+        "address": "г. Самарканд, ул. Рудакий, 120",
+        "phone": "+998-77-222-22-22",
+        "map_url": "https://www.openstreetmap.org/export/embed.html?bbox=66.95%2C39.64%2C67.02%2C39.71&layer=mapnik",
+    },
+    {
+        "slug": "shineray",
+        "name": "Shineray",
+        "logo": "/webapp/image/shineray.png",
+        "address": "г. Самарканд, ул. Буюк Ипак Йули, 18",
+        "phone": "+998-77-333-33-33",
+        "map_url": "https://www.openstreetmap.org/export/embed.html?bbox=66.96%2C39.65%2C67.00%2C39.70&layer=mapnik",
+    },
+]
 
 
 def init_db() -> None:
@@ -63,11 +92,44 @@ def init_db() -> None:
     )
     cur.execute(
         """
+        CREATE TABLE IF NOT EXISTS dealerships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            logo_url TEXT NOT NULL,
+            address TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            map_url TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    for item in DEFAULT_DEALERSHIPS:
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO dealerships (slug, name, logo_url, address, phone, map_url, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item["slug"],
+                item["name"],
+                item["logo"],
+                item["address"],
+                item["phone"],
+                item["map_url"],
+                datetime.utcnow().isoformat(),
+            ),
+        )
+
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS cars (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dealership_id INTEGER NOT NULL DEFAULT 1,
             brand TEXT NOT NULL,
             title TEXT NOT NULL,
             price TEXT NOT NULL,
+            currency TEXT NOT NULL DEFAULT 'UZS',
             year TEXT NOT NULL,
             mileage TEXT NOT NULL,
             engine TEXT NOT NULL,
@@ -79,8 +141,12 @@ def init_db() -> None:
         """
     )
     columns = {row[1] for row in cur.execute("PRAGMA table_info(cars)")}
+    if "dealership_id" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN dealership_id INTEGER NOT NULL DEFAULT 1")
     if "brand" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN brand TEXT NOT NULL DEFAULT 'Без марки'")
+    if "currency" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN currency TEXT NOT NULL DEFAULT 'UZS'")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS support_threads (
@@ -135,11 +201,65 @@ def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
 
-def list_cars() -> list[dict[str, Any]]:
+def list_dealerships() -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute("SELECT * FROM cars ORDER BY id DESC")
+    cur.execute("SELECT * FROM dealerships ORDER BY id ASC")
+    items = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return items
+
+
+def resolve_dealership_id(raw_value: str) -> int | None:
+    value = raw_value.strip().lower()
+    if not value:
+        return None
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    if value.isdigit():
+        cur.execute("SELECT id FROM dealerships WHERE id=?", (int(value),))
+    else:
+        cur.execute("SELECT id FROM dealerships WHERE lower(slug)=? OR lower(name)=?", (value, value))
+    row = cur.fetchone()
+    conn.close()
+    return int(row[0]) if row else None
+
+
+def normalize_currency(raw_value: str) -> str | None:
+    value = raw_value.strip().upper()
+    if value in {"USD", "$", "ДОЛЛАР", "ДОЛЛАРЫ", "ДОЛЛАРАХ"}:
+        return "USD"
+    if value in {"UZS", "СУМ", "СУМЫ", "СУМАХ"}:
+        return "UZS"
+    return None
+
+
+def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    if dealership_id:
+        cur.execute(
+            """
+            SELECT cars.*, dealerships.name AS dealership_name
+            FROM cars
+            LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
+            WHERE cars.dealership_id=?
+            ORDER BY cars.id DESC
+            """,
+            (dealership_id,),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT cars.*, dealerships.name AS dealership_name
+            FROM cars
+            LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
+            ORDER BY cars.id DESC
+            """
+        )
     items = [dict(row) for row in cur.fetchall()]
     conn.close()
     return items
@@ -149,7 +269,15 @@ def get_car(car_id: int) -> dict[str, Any] | None:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute("SELECT * FROM cars WHERE id=?", (car_id,))
+    cur.execute(
+        """
+        SELECT cars.*, dealerships.name AS dealership_name
+        FROM cars
+        LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
+        WHERE cars.id=?
+        """,
+        (car_id,),
+    )
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
@@ -160,8 +288,8 @@ def add_car(fields: list[str]) -> int:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO cars (brand, title, price, year, mileage, engine, transmission, description, image_url, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cars (dealership_id, brand, title, price, currency, year, mileage, engine, transmission, description, image_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -177,7 +305,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET brand=?, title=?, price=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?
+        SET dealership_id=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -270,19 +398,25 @@ def _required_text(payload: dict[str, Any], key: str) -> str:
 
 
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
+    dealership_id_raw = _required_text(payload, "dealership_id")
+    currency_raw = _required_text(payload, "currency")
+    dealership_id = resolve_dealership_id(dealership_id_raw)
+    currency = normalize_currency(currency_raw)
     brand = _required_text(payload, "brand")
     title = _required_text(payload, "title")
     price = _required_text(payload, "price")
     engine = _required_text(payload, "engine")
     description = _required_text(payload, "description")
-    if not all([brand, title, price, engine, description]):
+    if not all([brand, title, price, engine, description, dealership_id, currency]):
         return None
 
     image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
     return [
+        str(dealership_id),
         brand,
         title,
         price,
+        currency,
         "—",
         "—",
         engine,
@@ -344,10 +478,15 @@ async def addcar_cmd(message: Message) -> None:
     payload = (message.text or "").replace("/addcar", "", 1).strip()
     if payload:
         parts = [p.strip() for p in payload.split("|")]
-        if len(parts) != 9:
+        if len(parts) != 11:
             await message.answer(
-                "Формат:\n/addcar brand | title | price | year | mileage | engine | transmission | description | image_url"
+                "Формат:\n/addcar dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url"
             )
+            return
+        parts[0] = str(resolve_dealership_id(parts[0]) or "")
+        parts[4] = normalize_currency(parts[4]) or ""
+        if not parts[0] or not parts[4]:
+            await message.answer("❌ Неверный автосалон или валюта. Используйте ID автосалона и USD/UZS.")
             return
         car_id = add_car(parts)
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
@@ -407,6 +546,22 @@ async def addcar_step_handler(message: Message) -> None:
     key, _ = next_step
     draft[key] = text_value
 
+    if key == "dealership":
+        resolved = resolve_dealership_id(draft[key])
+        if not resolved:
+            draft.pop(key, None)
+            await message.answer("❌ Автосалон не найден. Введите ID, slug или название автосалона.")
+            return
+        draft[key] = str(resolved)
+
+    if key == "currency":
+        normalized = normalize_currency(draft[key])
+        if not normalized:
+            draft.pop(key, None)
+            await message.answer("❌ Валюта должна быть USD или UZS.")
+            return
+        draft[key] = normalized
+
     if key == "image_url" and draft[key] == "-":
         draft[key] = "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
 
@@ -417,9 +572,11 @@ async def addcar_step_handler(message: Message) -> None:
         return
 
     fields = [
+        draft["dealership"],
         draft["brand"],
         draft["title"],
         draft["price"],
+        draft["currency"],
         draft["year"],
         draft["mileage"],
         draft["engine"],
@@ -438,10 +595,15 @@ async def editcar_cmd(message: Message) -> None:
         return
     payload = message.text.replace("/editcar", "", 1).strip()
     parts = [p.strip() for p in payload.split("|")]
-    if len(parts) != 10 or not parts[0].isdigit():
+    if len(parts) != 12 or not parts[0].isdigit():
         await message.answer(
-            "Формат:\n/editcar id | brand | title | price | year | mileage | engine | transmission | description | image_url"
+            "Формат:\n/editcar id | dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url"
         )
+        return
+    parts[1] = str(resolve_dealership_id(parts[1]) or "")
+    parts[5] = normalize_currency(parts[5]) or ""
+    if not parts[1] or not parts[5]:
+        await message.answer("❌ Неверный автосалон или валюта. Используйте ID автосалона и USD/UZS.")
         return
     ok = edit_car(int(parts[0]), parts[1:])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")
@@ -517,8 +679,40 @@ async def car_page(_: web.Request) -> web.Response:
     return web.FileResponse("webapp/car.html")
 
 
-async def api_cars(_: web.Request) -> web.Response:
-    return web.json_response({"cars": list_cars()})
+async def api_cars(request: web.Request) -> web.Response:
+    dealership_id = int(request.query.get("dealership_id", "0"))
+    return web.json_response({"cars": list_cars(dealership_id if dealership_id else None)})
+
+
+async def api_dealerships(_: web.Request) -> web.Response:
+    return web.json_response({"dealerships": list_dealerships()})
+
+
+async def api_manage_dealership(request: web.Request) -> web.Response:
+    data = await request.json()
+    tg_id = int(data.get("tg_id", 0))
+    if not is_admin(tg_id):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+
+    dealership_id = int(request.match_info.get("dealership_id", "0"))
+    address = _required_text(data, "address")
+    phone = _required_text(data, "phone")
+    map_url = _required_text(data, "map_url")
+    if not dealership_id or not address or not phone or not map_url:
+        return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE dealerships SET address=?, phone=?, map_url=? WHERE id=?",
+        (address, phone, map_url, dealership_id),
+    )
+    conn.commit()
+    ok = cur.rowcount > 0
+    conn.close()
+    if not ok:
+        return web.json_response({"ok": False, "error": "not_found"}, status=404)
+    return web.json_response({"ok": True, "id": dealership_id})
 
 
 async def api_car(request: web.Request) -> web.Response:
@@ -560,6 +754,7 @@ async def api_support(request: web.Request) -> web.Response:
     data = await request.json()
     user_id = int(data.get("tg_id", 0))
     message = str(data.get("message", "")).strip()
+    dealership_name = str(data.get("dealership_name", "")).strip()
     if not user_id or not message:
         return web.json_response({"ok": False, "error": "bad_request"}, status=400)
 
@@ -570,7 +765,7 @@ async def api_support(request: web.Request) -> web.Response:
     user_display = get_user_display(user_id)
     sent = await bot.send_message(
         SUPPORT_GROUP_ID,
-        f"🆘 Новое обращение\nПользователь: {user_display}\nID: <code>{user_id}</code>\nСообщение: {message}",
+        f"🆘 Новое обращение\nПользователь: {user_display}\nID: <code>{user_id}</code>\nАвтосалон: {dealership_name or 'Не выбран'}\nСообщение: {message}",
     )
     save_support_map(sent.message_id, user_id)
     return web.json_response({"ok": True})
@@ -582,9 +777,11 @@ async def run_web(bot: Bot) -> None:
     app.router.add_get("/app", app_page)
     app.router.add_get("/car", car_page)
     app.router.add_get("/api/cars", api_cars)
+    app.router.add_get("/api/dealerships", api_dealerships)
     app.router.add_get("/api/cars/{car_id}", api_car)
     app.router.add_post("/api/cars", api_manage_car)
     app.router.add_put("/api/cars/{car_id}", api_manage_car)
+    app.router.add_put("/api/dealerships/{dealership_id}", api_manage_dealership)
     app.router.add_get("/api/is-admin", api_admin_check)
     app.router.add_post("/api/support", api_support)
     app.router.add_static("/webapp", path="webapp", show_index=False)

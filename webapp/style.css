@@ -58,6 +58,7 @@ body.app-ready .container {
   position: relative;
   width: min(280px, 72vw);
   aspect-ratio: 1 / 1;
+  contain: layout paint;
 }
 
 .startup-logo {
@@ -67,28 +68,30 @@ body.app-ready .container {
   width: clamp(82px, 22vw, 118px);
   height: clamp(82px, 22vw, 118px);
   object-fit: contain;
-  transform: translate(-50%, -50%) scale(0.85);
+  transform: translate3d(-50%, -50%, 0) scale(0.94);
+  transform-origin: center;
   opacity: 0;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.16));
-  animation: logo-sequence 1.5s ease-in-out forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: logo-sequence 1.35s cubic-bezier(0.24, 0.72, 0.24, 1) forwards;
 }
 
-.startup-logo-2 { animation-delay: 1.35s; }
-.startup-logo-3 { animation-delay: 2.7s; }
+.startup-logo-2 { animation-delay: 1.3s; }
+.startup-logo-3 { animation-delay: 2.6s; }
 
 @keyframes logo-sequence {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.78); }
-  28% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  46% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
-  72% { opacity: 1; transform: translate(-50%, -50%) scale(0.98); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.86); }
+  0% { opacity: 0; transform: translate3d(-50%, -50%, 0) scale(0.94); }
+  22% { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1); }
+  58% { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1.04); }
+  86% { opacity: 0.85; transform: translate3d(-50%, -50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate3d(-50%, -50%, 0) scale(0.97); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .startup-logo {
     animation: none;
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate3d(-50%, -50%, 0) scale(1);
   }
 }
 .header { margin-bottom: 18px; }

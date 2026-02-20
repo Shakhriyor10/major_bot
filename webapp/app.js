@@ -53,7 +53,7 @@ function playStartupSplash() {
       document.body.classList.remove('app-loading');
       document.body.classList.add('app-ready');
       resolve();
-    }, 4300);
+    }, 4100);
   });
 }
 

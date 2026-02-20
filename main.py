@@ -446,17 +446,28 @@ async def cars_cmd(message: Message) -> None:
     await message.answer(text)
 
 
+def is_support_responder(message: Message, member_status: str | None) -> bool:
+    if member_status in {"administrator", "creator"}:
+        return True
+    if message.sender_chat and message.sender_chat.id == message.chat.id:
+        return True
+    return bool(message.from_user and is_admin(message.from_user.id))
+
+
 @router.message(F.chat.id == SUPPORT_GROUP_ID, F.reply_to_message)
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
 
-    try:
-        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-    except TelegramBadRequest:
-        return
+    member_status: str | None = None
+    if message.from_user:
+        try:
+            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+            member_status = member.status
+        except TelegramBadRequest:
+            member_status = None
 
-    if member.status not in {"administrator", "creator"}:
+    if not is_support_responder(message, member_status):
         return
 
     user_id = resolve_support_user(message)

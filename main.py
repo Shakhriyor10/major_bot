@@ -522,7 +522,7 @@ async def cancelcar_cmd(message: Message) -> None:
     await message.answer("Добавление автомобиля отменено.")
 
 
-@router.message(F.text)
+@router.message(F.text, F.chat.type == "private")
 async def addcar_step_handler(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return

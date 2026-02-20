@@ -26,6 +26,9 @@ const brandFilterSelect = document.getElementById('brandFilter');
 const dealershipSelect = document.getElementById('dealership_id');
 const dealershipForm = document.getElementById('dealershipForm');
 const dealershipStatus = document.getElementById('dealershipStatus');
+const socialBar = document.getElementById('dealershipSocialBar');
+const instagramLink = document.getElementById('instagramLink');
+const telegramLink = document.getElementById('telegramLink');
 let isAdminUser = false;
 let allCars = [];
 let dealerships = [];
@@ -74,6 +77,7 @@ function openDealershipList() {
   adminBox.classList.add('hidden');
   currentDealership = null;
   updateHeaderTitle();
+  updateSocialBar();
 }
 
 function openSubmenu() {
@@ -83,6 +87,7 @@ function openSubmenu() {
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
+  updateSocialBar();
 }
 
 function openCars() {
@@ -91,6 +96,7 @@ function openCars() {
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   if (isAdminUser) adminBox.classList.remove('hidden');
+  updateSocialBar();
 }
 
 function openSupport() {
@@ -99,6 +105,7 @@ function openSupport() {
   supportSection.classList.remove('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
+  updateSocialBar();
 }
 
 function openLocation() {
@@ -107,6 +114,41 @@ function openLocation() {
   supportSection.classList.add('hidden');
   locationSection.classList.remove('hidden');
   adminBox.classList.add('hidden');
+  updateSocialBar();
+}
+
+
+function normalizeExternalUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return `https://${value}`;
+}
+
+function applySocialLink(anchor, url) {
+  const normalized = normalizeExternalUrl(url);
+  const isActive = Boolean(normalized);
+  anchor.href = isActive ? normalized : '#';
+  anchor.classList.toggle('disabled', !isActive);
+  anchor.classList.toggle('hidden', !isActive);
+  anchor.setAttribute('aria-disabled', String(!isActive));
+  return isActive;
+}
+
+function updateSocialBar() {
+  const isDealershipSelectionVisible = !dealershipSection.classList.contains('hidden');
+  if (!currentDealership || isDealershipSelectionVisible) {
+    socialBar.classList.add('hidden');
+    return;
+  }
+
+  const hasInstagram = applySocialLink(instagramLink, currentDealership.instagram_url);
+  const hasTelegram = applySocialLink(telegramLink, currentDealership.telegram_url);
+  socialBar.classList.toggle('hidden', !(hasInstagram || hasTelegram));
 }
 
 function renderDealerships() {
@@ -161,6 +203,8 @@ function fillLocation() {
   document.getElementById('dealershipAddressInput').value = currentDealership.address;
   document.getElementById('dealershipPhoneInput').value = currentDealership.phone;
   document.getElementById('dealershipMapInput').value = currentDealership.map_url;
+  document.getElementById('dealershipInstagramInput').value = currentDealership.instagram_url || '';
+  document.getElementById('dealershipTelegramInput').value = currentDealership.telegram_url || '';
 }
 
 function renderBrandFilter(cars) {
@@ -296,6 +340,8 @@ dealershipForm.addEventListener('submit', async (e) => {
     address: document.getElementById('dealershipAddressInput').value.trim(),
     phone: document.getElementById('dealershipPhoneInput').value.trim(),
     map_url: document.getElementById('dealershipMapInput').value.trim(),
+    instagram_url: normalizeExternalUrl(document.getElementById('dealershipInstagramInput').value),
+    telegram_url: normalizeExternalUrl(document.getElementById('dealershipTelegramInput').value),
   };
 
   const res = await fetch(`/api/dealerships/${currentDealership.id}`, {
@@ -309,6 +355,7 @@ dealershipForm.addEventListener('submit', async (e) => {
     await loadDealerships();
     currentDealership = dealerships.find((item) => item.id === payload.id) || currentDealership;
     fillLocation();
+    updateSocialBar();
   } else {
     dealershipStatus.textContent = '❌ Не удалось обновить контакты';
   }
@@ -369,5 +416,6 @@ brandFilterSelect.addEventListener('change', renderCars);
 
   await loadDealerships();
   openDealershipList();
+  updateSocialBar();
   await splashPromise;
 })();

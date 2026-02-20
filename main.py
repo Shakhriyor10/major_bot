@@ -100,6 +100,8 @@ def init_db() -> None:
             address TEXT NOT NULL,
             phone TEXT NOT NULL,
             map_url TEXT NOT NULL,
+            instagram_url TEXT NOT NULL DEFAULT '',
+            telegram_url TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         )
         """
@@ -147,6 +149,11 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN brand TEXT NOT NULL DEFAULT 'Без марки'")
     if "currency" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN currency TEXT NOT NULL DEFAULT 'UZS'")
+    dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
+    if "instagram_url" not in dealership_columns:
+        cur.execute("ALTER TABLE dealerships ADD COLUMN instagram_url TEXT NOT NULL DEFAULT ''")
+    if "telegram_url" not in dealership_columns:
+        cur.execute("ALTER TABLE dealerships ADD COLUMN telegram_url TEXT NOT NULL DEFAULT ''")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS support_threads (
@@ -757,14 +764,16 @@ async def api_manage_dealership(request: web.Request) -> web.Response:
     address = _required_text(data, "address")
     phone = _required_text(data, "phone")
     map_url = _required_text(data, "map_url")
+    instagram_url = _required_text(data, "instagram_url")
+    telegram_url = _required_text(data, "telegram_url")
     if not dealership_id or not address or not phone or not map_url:
         return web.json_response({"ok": False, "error": "bad_request"}, status=400)
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
-        "UPDATE dealerships SET address=?, phone=?, map_url=? WHERE id=?",
-        (address, phone, map_url, dealership_id),
+        "UPDATE dealerships SET address=?, phone=?, map_url=?, instagram_url=?, telegram_url=? WHERE id=?",
+        (address, phone, map_url, instagram_url, telegram_url, dealership_id),
     )
     conn.commit()
     ok = cur.rowcount > 0

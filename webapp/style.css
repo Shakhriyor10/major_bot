@@ -50,7 +50,18 @@ body {
   transform: translateY(-1px);
   border-color: var(--tg-button);
 }
-.menu-card-icon { font-size: 24px; }
+.menu-card-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu-card-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
 .menu-card-title { font-size: 18px; font-weight: 700; }
 .menu-card-subtitle { color: var(--tg-hint); font-size: 14px; }
 .back-btn {

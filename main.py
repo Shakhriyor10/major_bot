@@ -474,8 +474,13 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not user_id:
         return
 
-    reply_text = (message.text or message.caption or "").strip() or "[без текста]"
-    await bot.send_message(user_id, f"🔔 Сообщение от поддержки:\n{reply_text}")
+    await bot.send_message(user_id, "🔔 Новое сообщение от поддержки")
+    await bot.copy_message(
+        chat_id=user_id,
+        from_chat_id=message.chat.id,
+        message_id=message.message_id,
+        reply_markup=None,
+    )
     save_support_map(message.message_id, user_id)
 
 

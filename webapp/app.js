@@ -30,6 +30,8 @@ const dealershipStatus = document.getElementById('dealershipStatus');
 const socialBar = document.getElementById('dealershipSocialBar');
 const instagramLink = document.getElementById('instagramLink');
 const telegramLink = document.getElementById('telegramLink');
+const dealershipDescriptionBox = document.getElementById('dealershipDescriptionBox');
+const dealershipDescriptionText = document.getElementById('dealershipDescriptionText');
 let isAdminUser = false;
 let allCars = [];
 let dealerships = [];
@@ -78,6 +80,7 @@ function openDealershipList() {
   adminBox.classList.add('hidden');
   currentDealership = null;
   updateHeaderTitle();
+  fillDealershipDescription();
   updateSocialBar();
 }
 
@@ -88,6 +91,7 @@ function openSubmenu() {
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
+  fillDealershipDescription();
   updateSocialBar();
 }
 
@@ -152,6 +156,24 @@ function updateSocialBar() {
   socialBar.classList.toggle('hidden', !(hasInstagram || hasTelegram));
 }
 
+function fillDealershipDescription() {
+  if (!currentDealership) {
+    dealershipDescriptionBox.classList.add('hidden');
+    dealershipDescriptionText.textContent = '';
+    return;
+  }
+
+  const description = String(currentDealership.description || '').trim();
+  if (!description) {
+    dealershipDescriptionBox.classList.add('hidden');
+    dealershipDescriptionText.textContent = '';
+    return;
+  }
+
+  dealershipDescriptionText.textContent = description;
+  dealershipDescriptionBox.classList.remove('hidden');
+}
+
 function renderDealerships() {
   dealershipSection.innerHTML = dealerships.map((dealership) => `
     <button class="menu-card dealership-card" data-id="${dealership.id}">
@@ -169,6 +191,7 @@ function renderDealerships() {
       currentDealership = dealerships.find((item) => item.id === dealershipId) || null;
       updateHeaderTitle();
       fillLocation();
+      fillDealershipDescription();
       await loadCars();
       openSubmenu();
     });
@@ -204,6 +227,7 @@ function fillLocation() {
   document.getElementById('dealershipAddressInput').value = currentDealership.address;
   document.getElementById('dealershipPhoneInput').value = currentDealership.phone;
   document.getElementById('dealershipMapInput').value = currentDealership.map_url;
+  document.getElementById('dealershipDescriptionInput').value = currentDealership.description || '';
   document.getElementById('dealershipInstagramInput').value = currentDealership.instagram_url || '';
   document.getElementById('dealershipTelegramInput').value = currentDealership.telegram_url || '';
 }
@@ -374,6 +398,7 @@ dealershipForm.addEventListener('submit', async (e) => {
     address: document.getElementById('dealershipAddressInput').value.trim(),
     phone: document.getElementById('dealershipPhoneInput').value.trim(),
     map_url: document.getElementById('dealershipMapInput').value.trim(),
+    description: document.getElementById('dealershipDescriptionInput').value.trim(),
     instagram_url: normalizeExternalUrl(document.getElementById('dealershipInstagramInput').value),
     telegram_url: normalizeExternalUrl(document.getElementById('dealershipTelegramInput').value),
   };
@@ -389,6 +414,7 @@ dealershipForm.addEventListener('submit', async (e) => {
     await loadDealerships();
     currentDealership = dealerships.find((item) => item.id === payload.id) || currentDealership;
     fillLocation();
+    fillDealershipDescription();
     updateSocialBar();
   } else {
     dealershipStatus.textContent = '❌ Не удалось обновить контакты';

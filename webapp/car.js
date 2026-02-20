@@ -98,10 +98,14 @@ async function loadCar() {
     </article>
     <section class="description-box">
       <h2 class="description-title">Подробное описание</h2>
-      <p class="description-text">${car.description}</p>
+      <p id="carDescriptionText" class="description-text"></p>
     </section>
   `;
 
+  const descriptionNode = document.getElementById('carDescriptionText');
+  if (descriptionNode) {
+    descriptionNode.textContent = String(car.description || '');
+  }
 }
 
 loadCar();

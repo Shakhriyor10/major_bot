@@ -300,8 +300,12 @@ async function loadCars() {
 }
 
 window.openCar = (id) => {
-  const dealershipQuery = currentDealership ? `&dealership_id=${currentDealership.id}` : '';
-  window.location.href = `/car?id=${id}&tg_id=${tgId}${dealershipQuery}`;
+  const dealershipId = Number(currentDealership?.id || 0);
+  const dealershipQuery = dealershipId ? `&dealership_id=${dealershipId}` : '';
+  const returnUrl = dealershipId
+    ? `/app?tg_id=${tgId}&dealership_id=${dealershipId}&section=cars`
+    : `/app?tg_id=${tgId}`;
+  window.location.href = `/car?id=${id}&tg_id=${tgId}${dealershipQuery}&return_url=${encodeURIComponent(returnUrl)}`;
 };
 
 window.fillEdit = async (id) => {

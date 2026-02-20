@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime
 from typing import Any
@@ -210,6 +211,32 @@ def get_support_user(group_message_id: int) -> int | None:
     row = cur.fetchone()
     conn.close()
     return int(row[0]) if row else None
+
+
+def extract_user_id_from_support_message(message: Message) -> int | None:
+    content = (message.text or message.caption or "").strip()
+    if not content:
+        return None
+
+    match = re.search(r"\bID:\s*(\d+)\b", content)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def resolve_support_user(message: Message) -> int | None:
+    current = message.reply_to_message
+    while current:
+        user_id = get_support_user(current.message_id)
+        if user_id:
+            return user_id
+
+        parsed_user_id = extract_user_id_from_support_message(current)
+        if parsed_user_id:
+            return parsed_user_id
+
+        current = current.reply_to_message
+    return None
 
 
 def get_user_display(user_id: int) -> str:
@@ -436,25 +463,42 @@ async def cars_cmd(message: Message) -> None:
     await message.answer(text)
 
 
+def is_support_responder(message: Message, member_status: str | None) -> bool:
+    if member_status in {"administrator", "creator"}:
+        return True
+    if message.sender_chat and message.sender_chat.id == message.chat.id:
+        return True
+    return bool(message.from_user and is_admin(message.from_user.id))
+
+
 @router.message(F.chat.id == SUPPORT_GROUP_ID, F.reply_to_message)
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
 
-    try:
-        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-    except TelegramBadRequest:
+    member_status: str | None = None
+    if message.from_user:
+        try:
+            member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+            member_status = member.status
+        except TelegramBadRequest:
+            member_status = None
+
+    if not is_support_responder(message, member_status):
         return
 
-    if member.status not in {"administrator", "creator"}:
-        return
-
-    user_id = get_support_user(message.reply_to_message.message_id)
+    user_id = resolve_support_user(message)
     if not user_id:
         return
 
-    reply_text = (message.text or message.caption or "").strip() or "[без текста]"
-    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
+    await bot.send_message(user_id, "🔔 Новое сообщение от поддержки")
+    await bot.copy_message(
+        chat_id=user_id,
+        from_chat_id=message.chat.id,
+        message_id=message.message_id,
+        reply_markup=None,
+    )
+    save_support_map(message.message_id, user_id)
 
 
 async def app_page(_: web.Request) -> web.Response:

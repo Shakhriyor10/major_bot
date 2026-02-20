@@ -16,6 +16,8 @@ const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
 const carSearchInput = document.getElementById('carSearch');
 const brandFilterSelect = document.getElementById('brandFilter');
+const toggleLocationBtn = document.getElementById('toggleLocation');
+const addressDetails = document.getElementById('addressDetails');
 let isAdminUser = false;
 let allCars = [];
 
@@ -29,7 +31,6 @@ function formatPrice(value) {
 
 function showMenu() {
   menuSection.classList.remove('hidden');
-  document.getElementById('locationSection').classList.remove('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -37,7 +38,6 @@ function showMenu() {
 
 function openCars() {
   menuSection.classList.add('hidden');
-  document.getElementById('locationSection').classList.add('hidden');
   carsSection.classList.remove('hidden');
   supportSection.classList.add('hidden');
   if (isAdminUser) adminBox.classList.remove('hidden');
@@ -45,7 +45,6 @@ function openCars() {
 
 function openSupport() {
   menuSection.classList.add('hidden');
-  document.getElementById('locationSection').classList.add('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.remove('hidden');
   adminBox.classList.add('hidden');
@@ -175,6 +174,15 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
   } else {
     status.textContent = '❌ Не удалось отправить. Попробуйте позже.';
   }
+});
+
+
+
+toggleLocationBtn.addEventListener('click', () => {
+  const isOpen = !addressDetails.classList.contains('hidden');
+  addressDetails.classList.toggle('hidden', isOpen);
+  toggleLocationBtn.setAttribute('aria-expanded', String(!isOpen));
+  toggleLocationBtn.classList.toggle('expanded', !isOpen);
 });
 
 document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {

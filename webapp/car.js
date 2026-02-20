@@ -45,15 +45,33 @@ function getYoutubeEmbedUrl(rawUrl) {
   return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
 }
 
+function normalizeExternalUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
 function renderVideoBlock(car) {
-  const embedUrl = getYoutubeEmbedUrl(car.video_url);
-  if (!embedUrl) return '';
+  const videoUrl = normalizeExternalUrl(car.video_url);
+  if (!videoUrl) return '';
+
+  const embedUrl = getYoutubeEmbedUrl(videoUrl);
+  if (embedUrl) {
+    return `
+      <section class="description-box">
+        <h2 class="description-title">Видео обзор</h2>
+        <div id="videoPlayerContainer">
+          <iframe src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
+        </div>
+      </section>
+    `;
+  }
 
   return `
     <section class="description-box">
       <h2 class="description-title">Видео обзор</h2>
-      <button class="video-cover" id="videoCover" style="background-image: url('${car.image_url}');" aria-label="Воспроизвести видео"></button>
-      <div id="videoPlayerContainer" class="hidden"></div>
+      <a class="btn" href="${videoUrl}" target="_blank" rel="noopener noreferrer">Открыть видео</a>
     </section>
   `;
 }
@@ -93,16 +111,6 @@ async function loadCar() {
     ${renderVideoBlock(car)}
   `;
 
-  const embedUrl = getYoutubeEmbedUrl(car.video_url);
-  const videoCover = document.getElementById('videoCover');
-  const videoPlayerContainer = document.getElementById('videoPlayerContainer');
-  if (embedUrl && videoCover && videoPlayerContainer) {
-    videoCover.addEventListener('click', () => {
-      videoPlayerContainer.innerHTML = `<iframe src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
-      videoPlayerContainer.classList.remove('hidden');
-      videoCover.classList.add('hidden');
-    });
-  }
 }
 
 loadCar();

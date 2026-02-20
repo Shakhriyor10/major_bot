@@ -118,12 +118,25 @@ function openLocation() {
 }
 
 
+function normalizeExternalUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return `https://${value}`;
+}
+
 function applySocialLink(anchor, url) {
-  const normalized = String(url || '').trim();
+  const normalized = normalizeExternalUrl(url);
   const isActive = Boolean(normalized);
   anchor.href = isActive ? normalized : '#';
   anchor.classList.toggle('disabled', !isActive);
+  anchor.classList.toggle('hidden', !isActive);
   anchor.setAttribute('aria-disabled', String(!isActive));
+  return isActive;
 }
 
 function updateSocialBar() {
@@ -132,9 +145,9 @@ function updateSocialBar() {
     return;
   }
 
-  applySocialLink(instagramLink, currentDealership.instagram_url);
-  applySocialLink(telegramLink, currentDealership.telegram_url);
-  socialBar.classList.remove('hidden');
+  const hasInstagram = applySocialLink(instagramLink, currentDealership.instagram_url);
+  const hasTelegram = applySocialLink(telegramLink, currentDealership.telegram_url);
+  socialBar.classList.toggle('hidden', !(hasInstagram || hasTelegram));
 }
 
 function renderDealerships() {
@@ -326,8 +339,8 @@ dealershipForm.addEventListener('submit', async (e) => {
     address: document.getElementById('dealershipAddressInput').value.trim(),
     phone: document.getElementById('dealershipPhoneInput').value.trim(),
     map_url: document.getElementById('dealershipMapInput').value.trim(),
-    instagram_url: document.getElementById('dealershipInstagramInput').value.trim(),
-    telegram_url: document.getElementById('dealershipTelegramInput').value.trim(),
+    instagram_url: normalizeExternalUrl(document.getElementById('dealershipInstagramInput').value),
+    telegram_url: normalizeExternalUrl(document.getElementById('dealershipTelegramInput').value),
   };
 
   const res = await fetch(`/api/dealerships/${currentDealership.id}`, {

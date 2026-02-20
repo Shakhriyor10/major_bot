@@ -171,21 +171,6 @@ textarea { min-height: 90px; }
   font-size: 12px;
   font-weight: 600;
 }
-.address-details {
-  width: 100%;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line);
-  display: block;
-}
-.address-details-title {
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.address-details .menu-card-subtitle {
-  margin-bottom: 8px;
-}
 .menu-card-address.expanded {
   border-color: var(--tg-button);
 }
@@ -254,4 +239,8 @@ textarea { min-height: 90px; }
   .filters-box {
     grid-template-columns: 1fr;
   }
+}
+
+#locationSection h2 {
+  margin: 0 0 8px;
 }

@@ -17,7 +17,8 @@ const adminForm = document.getElementById('adminForm');
 const carSearchInput = document.getElementById('carSearch');
 const brandFilterSelect = document.getElementById('brandFilter');
 const toggleLocationBtn = document.getElementById('toggleLocation');
-const addressDetails = document.getElementById('addressDetails');
+const locationSection = document.getElementById('locationSection');
+const closeLocationBtn = document.getElementById('closeLocation');
 let isAdminUser = false;
 let allCars = [];
 
@@ -33,6 +34,7 @@ function showMenu() {
   menuSection.classList.remove('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.add('hidden');
+  locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
 }
 
@@ -40,6 +42,7 @@ function openCars() {
   menuSection.classList.add('hidden');
   carsSection.classList.remove('hidden');
   supportSection.classList.add('hidden');
+  locationSection.classList.add('hidden');
   if (isAdminUser) adminBox.classList.remove('hidden');
 }
 
@@ -47,6 +50,7 @@ function openSupport() {
   menuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   supportSection.classList.remove('hidden');
+  locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
 }
 
@@ -179,10 +183,21 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
 
 
 toggleLocationBtn.addEventListener('click', () => {
-  const isOpen = !addressDetails.classList.contains('hidden');
-  addressDetails.classList.toggle('hidden', isOpen);
+  menuSection.classList.remove('hidden');
+  carsSection.classList.add('hidden');
+  supportSection.classList.add('hidden');
+  adminBox.classList.add('hidden');
+
+  const isOpen = !locationSection.classList.contains('hidden');
+  locationSection.classList.toggle('hidden', isOpen);
   toggleLocationBtn.setAttribute('aria-expanded', String(!isOpen));
   toggleLocationBtn.classList.toggle('expanded', !isOpen);
+});
+
+closeLocationBtn.addEventListener('click', () => {
+  locationSection.classList.add('hidden');
+  toggleLocationBtn.setAttribute('aria-expanded', 'false');
+  toggleLocationBtn.classList.remove('expanded');
 });
 
 document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {

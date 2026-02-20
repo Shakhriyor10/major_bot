@@ -104,7 +104,9 @@ function renderDealerships() {
 
 function fillLocation() {
   if (!currentDealership) return;
-  document.getElementById('locationMap').src = currentDealership.map_url;
+  const locationLink = document.getElementById('locationLink');
+  locationLink.href = currentDealership.map_url || '#';
+  locationLink.classList.toggle('disabled', !currentDealership.map_url);
   document.getElementById('locationAddress').textContent = currentDealership.address;
   document.getElementById('locationPhone').textContent = `📞 ${currentDealership.phone}`;
   document.getElementById('dealershipAddressInput').value = currentDealership.address;

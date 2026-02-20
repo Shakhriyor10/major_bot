@@ -11,7 +11,7 @@
   <div class="container">
     <header class="header">
       <h1 class="title">🚘 Автосалоны</h1>
-      <p class="subtitle">Выберите автосалон, чтобы посмотреть автомобили, контакты и поддержку.</p>
+<!--      <p class="subtitle">Выберите автосалон, чтобы посмотреть автомобили, контакты и поддержку.</p>-->
     </header>
 
     <section id="dealershipSection" class="menu-grid"></section>
@@ -44,12 +44,12 @@
     <section id="locationSection" class="support-box hidden">
       <button id="backToSubmenuFromLocation" class="back-btn">← Назад</button>
       <h2>Адрес и контакты</h2>
-      <iframe id="locationMap" class="map-frame" title="Карта автосалона" loading="lazy"></iframe>
       <p id="locationAddress" class="subtitle location-address"></p>
+<!--      <p class="subtitle location-link-title">Местоположение и ссылка</p>-->
+      <a id="locationLink" class="location-link" href="#" target="_blank" rel="noopener noreferrer">Местоположение</a>
       <p id="locationPhone" class="location-phone"></p>
 
       <form id="dealershipForm" class="admin-form hidden">
-        <h3>Редактирование контактов автосалона</h3>
         <input id="dealershipAddressInput" placeholder="Адрес" required />
         <input id="dealershipPhoneInput" placeholder="Телефон" required />
         <input id="dealershipMapInput" placeholder="Ссылка на карту" required />

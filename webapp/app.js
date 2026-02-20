@@ -16,6 +16,14 @@ const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
 let isAdminUser = false;
 
+function formatPrice(value) {
+  const raw = String(value ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return raw;
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return `${grouped} сум`;
+}
+
 function showMenu() {
   menuSection.classList.remove('hidden');
   carsSection.classList.add('hidden');
@@ -52,7 +60,7 @@ async function loadCars() {
       <img src="${car.image_url}" alt="${car.title}" />
       <div class="card-body">
         <h3 class="car-title">${car.title}</h3>
-        <p class="price">${car.price}</p>
+        <p class="price">${formatPrice(car.price)}</p>
         <div class="specs">Объем двигателя: ${car.engine}</div>
         <button class="btn" onclick="openCar(${car.id})">Подробнее</button>
         ${isAdminUser ? `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>` : ''}
@@ -92,7 +100,7 @@ adminForm.addEventListener('submit', async (e) => {
   const payload = {
     tg_id: tgId,
     title: document.getElementById('title').value.trim(),
-    price: document.getElementById('price').value.trim(),
+    price: formatPrice(document.getElementById('price').value),
     engine: document.getElementById('engine').value.trim(),
     description: document.getElementById('description').value.trim(),
     image_url: document.getElementById('image_url').value.trim(),

@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -347,11 +347,13 @@ def get_support_user(group_message_id: int) -> int | None:
 
 
 def extract_user_id_from_support_message(message: Message) -> int | None:
-    content = (message.text or message.caption or "").strip()
+    content = (message.html_text or message.text or message.caption or "").strip()
     if not content:
         return None
 
-    match = re.search(r"\bID:\s*(\d+)\b", content)
+    content = re.sub(r"<[^>]+>", "", content)
+
+    match = re.search(r"\bID\s*:\s*(\d+)\b", content, flags=re.IGNORECASE)
     if not match:
         return None
     return int(match.group(1))
@@ -641,6 +643,13 @@ def is_support_responder(message: Message, member_status: str | None) -> bool:
     return bool(message.from_user and is_admin(message.from_user.id))
 
 
+def extract_support_reply_text(message: Message) -> str:
+    text = (message.html_text or message.text or message.caption or "").strip()
+    if text:
+        return text
+    return "📩 Поддержка отправила вам сообщение (не текстовый формат)."
+
+
 @router.message(F.chat.id == SUPPORT_GROUP_ID, F.reply_to_message)
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
@@ -661,13 +670,19 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not user_id:
         return
 
-    await bot.send_message(user_id, "🔔 Новое сообщение от поддержки")
-    await bot.copy_message(
-        chat_id=user_id,
-        from_chat_id=message.chat.id,
-        message_id=message.message_id,
-        reply_markup=None,
-    )
+    try:
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=message.chat.id,
+            message_id=message.message_id,
+            reply_markup=None,
+        )
+    except TelegramBadRequest:
+        await bot.send_message(user_id, f"🔔 Новое сообщение от поддержки\n\n{extract_support_reply_text(message)}")
+    except TelegramForbiddenError:
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: бот заблокирован", user_id)
+        return
+
     save_support_map(message.message_id, user_id)
 
 

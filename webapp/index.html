@@ -119,7 +119,9 @@
         </select>
         <input id="engine" placeholder="Объем двигателя" required />
         <textarea id="description" placeholder="Описание" required></textarea>
-        <input id="image_url" placeholder="Ссылка на фото (необязательно)" />
+        <input type="file" id="image_file" accept="image/*" />
+        <input id="image_url" placeholder="Ссылка на фото (заполнится автоматически при загрузке)" />
+        <input id="video_url" placeholder="Ссылка на видео (YouTube, необязательно)" />
         <div class="admin-actions">
           <button type="submit" class="btn">Сохранить</button>
           <button type="button" id="cancelEdit" class="btn btn-secondary hidden">Отмена</button>

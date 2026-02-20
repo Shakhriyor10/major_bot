@@ -6,6 +6,7 @@ if (tg) {
 
 const params = new URLSearchParams(window.location.search);
 const carId = Number(params.get('id'));
+const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
 
 function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
@@ -13,6 +14,28 @@ function formatPrice(value, currency = 'UZS') {
   if (!digits) return raw;
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
+}
+
+function getYoutubeEmbedUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+
+  const youtubeMatch = value.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i);
+  if (!youtubeMatch) return '';
+  return `https://www.youtube.com/embed/${youtubeMatch[1]}?autoplay=1&rel=0`;
+}
+
+function renderVideoBlock(car) {
+  const embedUrl = getYoutubeEmbedUrl(car.video_url);
+  if (!embedUrl) return '';
+
+  return `
+    <section class="description-box">
+      <h2 class="description-title">Видео обзор</h2>
+      <button class="video-cover" id="videoCover" style="background-image: url('${car.image_url}');" aria-label="Воспроизвести видео"></button>
+      <div id="videoPlayerContainer" class="hidden"></div>
+    </section>
+  `;
 }
 
 async function loadCar() {
@@ -30,7 +53,7 @@ async function loadCar() {
 
   const car = await res.json();
   root.innerHTML = `
-    <a href="/app" class="back">← Назад к каталогу</a>
+    <a href="/app?tg_id=${tgId}" class="back">← Назад к каталогу</a>
     <article class="card">
       <img src="${car.image_url}" alt="${car.title}" />
       <div class="card-body">
@@ -47,7 +70,19 @@ async function loadCar() {
       <h2 class="description-title">Подробное описание</h2>
       <p class="description-text">${car.description}</p>
     </section>
+    ${renderVideoBlock(car)}
   `;
+
+  const embedUrl = getYoutubeEmbedUrl(car.video_url);
+  const videoCover = document.getElementById('videoCover');
+  const videoPlayerContainer = document.getElementById('videoPlayerContainer');
+  if (embedUrl && videoCover && videoPlayerContainer) {
+    videoCover.addEventListener('click', () => {
+      videoPlayerContainer.innerHTML = `<iframe src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+      videoPlayerContainer.classList.remove('hidden');
+      videoCover.classList.add('hidden');
+    });
+  }
 }
 
 loadCar();

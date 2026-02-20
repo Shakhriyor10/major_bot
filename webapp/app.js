@@ -21,6 +21,7 @@ const adminBox = document.getElementById('adminBox');
 const adminStatus = document.getElementById('adminStatus');
 const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
+const imageFileInput = document.getElementById('image_file');
 const carSearchInput = document.getElementById('carSearch');
 const brandFilterSelect = document.getElementById('brandFilter');
 const dealershipSelect = document.getElementById('dealership_id');
@@ -285,6 +286,8 @@ window.fillEdit = async (id) => {
   document.getElementById('engine').value = car.engine;
   document.getElementById('description').value = car.description;
   document.getElementById('image_url').value = car.image_url || '';
+  document.getElementById('video_url').value = car.video_url || '';
+  imageFileInput.value = '';
   cancelEditBtn.classList.remove('hidden');
   adminStatus.textContent = `Редактирование #${car.id}`;
 };
@@ -292,41 +295,72 @@ window.fillEdit = async (id) => {
 cancelEditBtn.addEventListener('click', () => {
   adminForm.reset();
   document.getElementById('carId').value = '';
+  imageFileInput.value = '';
   cancelEditBtn.classList.add('hidden');
   adminStatus.textContent = '';
 });
 
+async function uploadImageIfNeeded() {
+  const file = imageFileInput.files?.[0];
+  if (!file) {
+    return document.getElementById('image_url').value.trim();
+  }
+
+  const formData = new FormData();
+  formData.append('tg_id', String(tgId));
+  formData.append('image', file);
+
+  const uploadRes = await fetch('/api/upload-image', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!uploadRes.ok) {
+    throw new Error('upload_failed');
+  }
+  const uploadData = await uploadRes.json();
+  const imageUrl = String(uploadData.image_url || '').trim();
+  document.getElementById('image_url').value = imageUrl;
+  return imageUrl;
+}
+
 adminForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const carId = document.getElementById('carId').value;
-  const payload = {
-    tg_id: tgId,
-    dealership_id: Number(dealershipSelect.value),
-    brand: document.getElementById('brand').value.trim(),
-    title: document.getElementById('title').value.trim(),
-    price: document.getElementById('price').value.trim(),
-    currency: document.getElementById('currency').value,
-    engine: document.getElementById('engine').value.trim(),
-    description: document.getElementById('description').value.trim(),
-    image_url: document.getElementById('image_url').value.trim(),
-  };
+  try {
+    const carId = document.getElementById('carId').value;
+    const imageUrl = await uploadImageIfNeeded();
+    const payload = {
+      tg_id: tgId,
+      dealership_id: Number(dealershipSelect.value),
+      brand: document.getElementById('brand').value.trim(),
+      title: document.getElementById('title').value.trim(),
+      price: document.getElementById('price').value.trim(),
+      currency: document.getElementById('currency').value,
+      engine: document.getElementById('engine').value.trim(),
+      description: document.getElementById('description').value.trim(),
+      image_url: imageUrl,
+      video_url: document.getElementById('video_url').value.trim(),
+    };
 
-  const url = carId ? `/api/cars/${carId}` : '/api/cars';
-  const method = carId ? 'PUT' : 'POST';
-  const res = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+    const url = carId ? `/api/cars/${carId}` : '/api/cars';
+    const method = carId ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  if (res.ok) {
-    adminStatus.textContent = carId ? '✅ Машина обновлена' : '✅ Машина добавлена';
-    adminForm.reset();
-    document.getElementById('carId').value = '';
-    cancelEditBtn.classList.add('hidden');
-    await loadCars();
-  } else {
-    adminStatus.textContent = '❌ Ошибка сохранения. Проверьте права и заполнение полей.';
+    if (res.ok) {
+      adminStatus.textContent = carId ? '✅ Машина обновлена' : '✅ Машина добавлена';
+      adminForm.reset();
+      document.getElementById('carId').value = '';
+      imageFileInput.value = '';
+      cancelEditBtn.classList.add('hidden');
+      await loadCars();
+    } else {
+      adminStatus.textContent = '❌ Ошибка сохранения. Проверьте права и заполнение полей.';
+    }
+  } catch (_) {
+    adminStatus.textContent = '❌ Не удалось загрузить фото. Попробуйте другой файл.';
   }
 });
 

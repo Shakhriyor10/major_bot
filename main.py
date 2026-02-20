@@ -669,6 +669,37 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     user_id = resolve_support_user(message)
     if not user_id:
         return
+    is_text_only = bool(message.text) and not any(
+        [
+            message.photo,
+            message.video,
+            message.document,
+            message.audio,
+            message.voice,
+            message.video_note,
+            message.animation,
+            message.sticker,
+            message.location,
+            message.contact,
+            message.poll,
+            message.venue,
+            message.dice,
+        ]
+    )
+
+    if is_text_only:
+        support_text = extract_support_reply_text(message)
+        try:
+            await bot.send_message(user_id, f"Сообщение от поддержки: {support_text}")
+        except TelegramForbiddenError:
+            logging.warning("Не удалось отправить текстовый ответ поддержки пользователю %s: бот заблокирован", user_id)
+            return
+        except TelegramBadRequest:
+            logging.warning("Не удалось отправить текстовый ответ поддержки пользователю %s", user_id)
+            return
+        save_support_map(message.message_id, user_id)
+        return
+
     try:
         await bot.send_message(user_id, "Сообщение от поддержки:")
     except TelegramForbiddenError:

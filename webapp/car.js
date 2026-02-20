@@ -20,9 +20,29 @@ function getYoutubeEmbedUrl(rawUrl) {
   const value = String(rawUrl || '').trim();
   if (!value) return '';
 
-  const youtubeMatch = value.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i);
-  if (!youtubeMatch) return '';
-  return `https://www.youtube.com/embed/${youtubeMatch[1]}?autoplay=1&rel=0`;
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(value.includes('://') ? value : `https://${value}`);
+  } catch (_) {
+    return '';
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+  let videoId = '';
+
+  if (host === 'youtu.be') {
+    videoId = pathParts[0] || '';
+  } else if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+    videoId = parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('vi') || '';
+    if (!videoId && pathParts.length >= 2 && ['embed', 'shorts', 'live', 'v'].includes(pathParts[0])) {
+      videoId = pathParts[1];
+    }
+  }
+
+  videoId = videoId.replace(/[^A-Za-z0-9_-]/g, '');
+  if (videoId.length < 6) return '';
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
 }
 
 function renderVideoBlock(car) {

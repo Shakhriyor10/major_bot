@@ -183,6 +183,9 @@ textarea { min-height: 90px; }
   font-weight: 700;
   margin-bottom: 4px;
 }
+.address-details .menu-card-subtitle {
+  margin-bottom: 8px;
+}
 .menu-card-address.expanded {
   border-color: var(--tg-button);
 }

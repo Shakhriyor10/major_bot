@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -347,11 +347,13 @@ def get_support_user(group_message_id: int) -> int | None:
 
 
 def extract_user_id_from_support_message(message: Message) -> int | None:
-    content = (message.text or message.caption or "").strip()
+    content = (message.html_text or message.text or message.caption or "").strip()
     if not content:
         return None
 
-    match = re.search(r"\bID:\s*(\d+)\b", content)
+    content = re.sub(r"<[^>]+>", "", content)
+
+    match = re.search(r"\bID\s*:\s*(\d+)\b", content, flags=re.IGNORECASE)
     if not match:
         return None
     return int(match.group(1))
@@ -520,7 +522,7 @@ async def cancelcar_cmd(message: Message) -> None:
     await message.answer("Добавление автомобиля отменено.")
 
 
-@router.message(F.text)
+@router.message(F.text, F.chat.type == "private")
 async def addcar_step_handler(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return
@@ -641,6 +643,13 @@ def is_support_responder(message: Message, member_status: str | None) -> bool:
     return bool(message.from_user and is_admin(message.from_user.id))
 
 
+def extract_support_reply_text(message: Message) -> str:
+    text = (message.html_text or message.text or message.caption or "").strip()
+    if text:
+        return text
+    return "📩 Поддержка отправила вам сообщение (не текстовый формат)."
+
+
 @router.message(F.chat.id == SUPPORT_GROUP_ID, F.reply_to_message)
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
@@ -660,14 +669,64 @@ async def group_reply_handler(message: Message, bot: Bot) -> None:
     user_id = resolve_support_user(message)
     if not user_id:
         return
-
-    await bot.send_message(user_id, "🔔 Новое сообщение от поддержки")
-    await bot.copy_message(
-        chat_id=user_id,
-        from_chat_id=message.chat.id,
-        message_id=message.message_id,
-        reply_markup=None,
+    is_text_only = bool(message.text) and not any(
+        [
+            message.photo,
+            message.video,
+            message.document,
+            message.audio,
+            message.voice,
+            message.video_note,
+            message.animation,
+            message.sticker,
+            message.location,
+            message.contact,
+            message.poll,
+            message.venue,
+            message.dice,
+        ]
     )
+
+    if is_text_only:
+        support_text = extract_support_reply_text(message)
+        try:
+            await bot.send_message(user_id, f"Сообщение от поддержки: {support_text}")
+        except TelegramForbiddenError:
+            logging.warning("Не удалось отправить текстовый ответ поддержки пользователю %s: бот заблокирован", user_id)
+            return
+        except TelegramBadRequest:
+            logging.warning("Не удалось отправить текстовый ответ поддержки пользователю %s", user_id)
+            return
+        save_support_map(message.message_id, user_id)
+        return
+
+    try:
+        await bot.send_message(user_id, "Сообщение от поддержки:")
+    except TelegramForbiddenError:
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: бот заблокирован", user_id)
+        return
+    except TelegramBadRequest:
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: не удалось отправить префикс", user_id)
+        return
+
+    try:
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=message.chat.id,
+            message_id=message.message_id,
+            reply_markup=None,
+        )
+    except TelegramForbiddenError:
+        logging.warning("Не удалось отправить ответ поддержки пользователю %s: бот заблокирован", user_id)
+        return
+    except TelegramBadRequest:
+        support_text = extract_support_reply_text(message)
+        try:
+            await bot.send_message(user_id, support_text)
+        except (TelegramForbiddenError, TelegramBadRequest):
+            logging.warning("Не удалось доставить fallback ответ поддержки пользователю %s", user_id)
+            return
+
     save_support_map(message.message_id, user_id)
 
 

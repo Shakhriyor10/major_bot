@@ -1,4 +1,6 @@
 const tg = window.Telegram?.WebApp;
+document.body.classList.add('app-loading');
+
 if (tg) {
   tg.ready();
   tg.expand();
@@ -28,6 +30,32 @@ let isAdminUser = false;
 let allCars = [];
 let dealerships = [];
 let currentDealership = null;
+
+function playStartupSplash() {
+  const splash = document.getElementById('startupSplash');
+  if (!splash) {
+    document.body.classList.remove('app-loading');
+    document.body.classList.add('app-ready');
+    return Promise.resolve();
+  }
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) {
+    splash.classList.add('is-hidden');
+    document.body.classList.remove('app-loading');
+    document.body.classList.add('app-ready');
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      splash.classList.add('is-hidden');
+      document.body.classList.remove('app-loading');
+      document.body.classList.add('app-ready');
+      resolve();
+    }, 4100);
+  });
+}
 
 function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
@@ -328,6 +356,7 @@ carSearchInput.addEventListener('input', renderCars);
 brandFilterSelect.addEventListener('change', renderCars);
 
 (async () => {
+  const splashPromise = playStartupSplash();
   const adminCheck = await fetch(`/api/is-admin?tg_id=${tgId}`);
   if (adminCheck.ok) {
     const data = await adminCheck.json();
@@ -340,4 +369,5 @@ brandFilterSelect.addEventListener('change', renderCars);
 
   await loadDealerships();
   openDealershipList();
+  await splashPromise;
 })();

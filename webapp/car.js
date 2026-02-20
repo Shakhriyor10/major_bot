@@ -6,6 +6,7 @@ if (tg) {
 
 const params = new URLSearchParams(window.location.search);
 const carId = Number(params.get('id'));
+const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
 
 function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
@@ -13,6 +14,66 @@ function formatPrice(value, currency = 'UZS') {
   if (!digits) return raw;
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
+}
+
+function getYoutubeEmbedUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(value.includes('://') ? value : `https://${value}`);
+  } catch (_) {
+    return '';
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+  let videoId = '';
+
+  if (host === 'youtu.be') {
+    videoId = pathParts[0] || '';
+  } else if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+    videoId = parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('vi') || '';
+    if (!videoId && pathParts.length >= 2 && ['embed', 'shorts', 'live', 'v'].includes(pathParts[0])) {
+      videoId = pathParts[1];
+    }
+  }
+
+  videoId = videoId.replace(/[^A-Za-z0-9_-]/g, '');
+  if (videoId.length < 6) return '';
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+}
+
+function normalizeExternalUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+function renderVideoBlock(car) {
+  const videoUrl = normalizeExternalUrl(car.video_url);
+  if (!videoUrl) return '';
+
+  const embedUrl = getYoutubeEmbedUrl(videoUrl);
+  if (embedUrl) {
+    return `
+      <section class="description-box">
+        <h2 class="description-title">Видео обзор</h2>
+        <div id="videoPlayerContainer">
+          <iframe src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="description-box">
+      <h2 class="description-title">Видео обзор</h2>
+      <a class="btn" href="${videoUrl}" target="_blank" rel="noopener noreferrer">Открыть видео</a>
+    </section>
+  `;
 }
 
 async function loadCar() {
@@ -30,7 +91,7 @@ async function loadCar() {
 
   const car = await res.json();
   root.innerHTML = `
-    <a href="/app" class="back">← Назад к каталогу</a>
+    <a href="/app?tg_id=${tgId}" class="back">← Назад к каталогу</a>
     <article class="card">
       <img src="${car.image_url}" alt="${car.title}" />
       <div class="card-body">
@@ -47,7 +108,9 @@ async function loadCar() {
       <h2 class="description-title">Подробное описание</h2>
       <p class="description-text">${car.description}</p>
     </section>
+    ${renderVideoBlock(car)}
   `;
+
 }
 
 loadCar();

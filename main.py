@@ -1,10 +1,12 @@
 import asyncio
+import io
 import logging
 import os
 import re
 import sqlite3
 from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
@@ -29,6 +31,7 @@ ADMIN_IDS = {
 }
 
 DB_PATH = "dealership.db"
+UPLOADS_DIR = os.path.join("webapp", "uploads")
 
 router = Router()
 
@@ -43,7 +46,8 @@ ADD_CAR_STEPS = [
     ("engine", "Введите двигатель (например: 3.0 л, 340 л.с.):"),
     ("transmission", "Введите коробку передач (например: Автомат):"),
     ("description", "Введите описание автомобиля:"),
-    ("image_url", "Введите ссылку на фото (или отправьте '-' чтобы использовать стандартное изображение):"),
+    ("image_url", "Отправьте фото автомобиля (или '-' для стандартного изображения):"),
+    ("video_url", "Введите ссылку на видео (YouTube, можно '-' если без видео):"),
 ]
 ADMIN_CAR_DRAFTS: dict[int, dict[str, str]] = {}
 
@@ -76,6 +80,7 @@ DEFAULT_DEALERSHIPS = [
 
 
 def init_db() -> None:
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
@@ -138,6 +143,7 @@ def init_db() -> None:
             transmission TEXT NOT NULL,
             description TEXT NOT NULL,
             image_url TEXT NOT NULL,
+            video_url TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         )
         """
@@ -149,6 +155,8 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN brand TEXT NOT NULL DEFAULT 'Без марки'")
     if "currency" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN currency TEXT NOT NULL DEFAULT 'UZS'")
+    if "video_url" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN video_url TEXT NOT NULL DEFAULT ''")
     dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
     if "instagram_url" not in dealership_columns:
         cur.execute("ALTER TABLE dealerships ADD COLUMN instagram_url TEXT NOT NULL DEFAULT ''")
@@ -295,8 +303,8 @@ def add_car(fields: list[str]) -> int:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO cars (dealership_id, brand, title, price, currency, year, mileage, engine, transmission, description, image_url, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cars (dealership_id, brand, title, price, currency, year, mileage, engine, transmission, description, image_url, video_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -312,7 +320,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET dealership_id=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?
+        SET dealership_id=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, video_url=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -420,6 +428,7 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         return None
 
     image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
+    video_url = _required_text(payload, "video_url")
     return [
         str(dealership_id),
         brand,
@@ -432,7 +441,19 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         "—",
         description,
         image_url,
+        video_url,
     ]
+
+
+def save_uploaded_image(raw_data: bytes, original_name: str = "") -> str:
+    extension = os.path.splitext(original_name)[1].lower()
+    if extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+        extension = ".jpg"
+    file_name = f"{uuid4().hex}{extension}"
+    output_path = os.path.join(UPLOADS_DIR, file_name)
+    with open(output_path, "wb") as file:
+        file.write(raw_data)
+    return f"/webapp/uploads/{file_name}"
 
 
 @router.message(Command("start"))
@@ -487,9 +508,9 @@ async def addcar_cmd(message: Message) -> None:
     payload = (message.text or "").replace("/addcar", "", 1).strip()
     if payload:
         parts = [p.strip() for p in payload.split("|")]
-        if len(parts) != 11:
+        if len(parts) != 12:
             await message.answer(
-                "Формат:\n/addcar dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url"
+                "Формат:\n/addcar dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
             )
             return
         parts[0] = str(resolve_dealership_id(parts[0]) or "")
@@ -553,6 +574,9 @@ async def addcar_step_handler(message: Message) -> None:
         return
 
     key, _ = next_step
+    if key == "image_url" and text_value != "-":
+        await message.answer("На этом шаге отправьте фото автомобиля или '-' для стандартного изображения.")
+        return
     draft[key] = text_value
 
     if key == "dealership":
@@ -574,6 +598,9 @@ async def addcar_step_handler(message: Message) -> None:
     if key == "image_url" and draft[key] == "-":
         draft[key] = "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
 
+    if key == "video_url" and draft[key] == "-":
+        draft[key] = ""
+
     upcoming_step = _get_next_addcar_step(draft)
     if upcoming_step:
         _, next_prompt = upcoming_step
@@ -592,6 +619,7 @@ async def addcar_step_handler(message: Message) -> None:
         draft["transmission"],
         draft["description"],
         draft["image_url"],
+        draft["video_url"],
     ]
     car_id = add_car(fields)
     ADMIN_CAR_DRAFTS.pop(message.from_user.id, None)
@@ -604,9 +632,9 @@ async def editcar_cmd(message: Message) -> None:
         return
     payload = message.text.replace("/editcar", "", 1).strip()
     parts = [p.strip() for p in payload.split("|")]
-    if len(parts) != 12 or not parts[0].isdigit():
+    if len(parts) != 13 or not parts[0].isdigit():
         await message.answer(
-            "Формат:\n/editcar id | dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url"
+            "Формат:\n/editcar id | dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
         )
         return
     parts[1] = str(resolve_dealership_id(parts[1]) or "")
@@ -616,6 +644,37 @@ async def editcar_cmd(message: Message) -> None:
         return
     ok = edit_car(int(parts[0]), parts[1:])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")
+
+
+@router.message(F.photo, F.chat.type == "private")
+async def addcar_photo_step_handler(message: Message, bot: Bot) -> None:
+    if not is_admin(message.from_user.id):
+        return
+
+    draft = ADMIN_CAR_DRAFTS.get(message.from_user.id)
+    if draft is None:
+        return
+
+    next_step = _get_next_addcar_step(draft)
+    if not next_step:
+        return
+
+    key, _ = next_step
+    if key != "image_url":
+        await message.answer("Сейчас ожидается текстовое поле. Для отмены используйте /cancelcar")
+        return
+
+    photo = message.photo[-1]
+    file = await bot.get_file(photo.file_id)
+    output = io.BytesIO()
+    await bot.download(file, destination=output)
+    draft[key] = save_uploaded_image(output.getvalue(), f"{photo.file_unique_id}.jpg")
+
+    upcoming_step = _get_next_addcar_step(draft)
+    if upcoming_step:
+        _, next_prompt = upcoming_step
+        await message.answer(next_prompt)
+        return
 
 
 @router.message(Command("delcar"))
@@ -812,6 +871,31 @@ async def api_manage_car(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "id": car_id})
 
 
+async def api_upload_image(request: web.Request) -> web.Response:
+    reader = await request.multipart()
+    tg_id = 0
+    image_bytes = b""
+    filename = ""
+
+    while True:
+        part = await reader.next()
+        if part is None:
+            break
+        if part.name == "tg_id":
+            tg_id = int((await part.text()).strip() or 0)
+        if part.name == "image":
+            filename = part.filename or ""
+            image_bytes = await part.read(decode=False)
+
+    if not is_admin(tg_id):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    if not image_bytes:
+        return web.json_response({"ok": False, "error": "no_image"}, status=400)
+
+    image_url = save_uploaded_image(image_bytes, filename)
+    return web.json_response({"ok": True, "image_url": image_url})
+
+
 
 
 async def api_admin_check(request: web.Request) -> web.Response:
@@ -849,6 +933,7 @@ async def run_web(bot: Bot) -> None:
     app.router.add_get("/api/cars/{car_id}", api_car)
     app.router.add_post("/api/cars", api_manage_car)
     app.router.add_put("/api/cars/{car_id}", api_manage_car)
+    app.router.add_post("/api/upload-image", api_upload_image)
     app.router.add_put("/api/dealerships/{dealership_id}", api_manage_dealership)
     app.router.add_get("/api/is-admin", api_admin_check)
     app.router.add_post("/api/support", api_support)

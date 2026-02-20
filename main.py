@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime
 from typing import Any
@@ -10,7 +11,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import (
     KeyboardButton,
     Message,
@@ -210,6 +211,33 @@ def get_support_user(group_message_id: int) -> int | None:
     row = cur.fetchone()
     conn.close()
     return int(row[0]) if row else None
+
+
+def extract_support_user_from_message(message: Message) -> int | None:
+    mapped_user = get_support_user(message.message_id)
+    if mapped_user:
+        return mapped_user
+
+    content = (message.text or message.caption or "").strip()
+    if not content:
+        return None
+
+    match = re.search(r"ID:\s*(?:<code>)?(\d+)(?:</code>)?", content)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def resolve_support_user(message: Message) -> int | None:
+    current = message
+    visited: set[int] = set()
+    while current and current.message_id not in visited:
+        visited.add(current.message_id)
+        user_id = extract_support_user_from_message(current)
+        if user_id:
+            return user_id
+        current = current.reply_to_message
+    return None
 
 
 def get_user_display(user_id: int) -> str:
@@ -440,21 +468,35 @@ async def cars_cmd(message: Message) -> None:
 async def group_reply_handler(message: Message, bot: Bot) -> None:
     if not message.reply_to_message:
         return
-
-    try:
-        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-    except TelegramBadRequest:
+    if message.from_user and message.from_user.is_bot:
         return
 
-    if member.status not in {"administrator", "creator"}:
-        return
-
-    user_id = get_support_user(message.reply_to_message.message_id)
+    user_id = resolve_support_user(message.reply_to_message)
     if not user_id:
         return
 
-    reply_text = (message.text or message.caption or "").strip() or "[без текста]"
-    await bot.send_message(user_id, f"💬 Ответ поддержки:\n{reply_text}")
+    save_support_map(message.message_id, user_id)
+
+    reply_text = (message.text or message.caption or "").strip()
+    if not reply_text:
+        if message.photo:
+            reply_text = "[Фото от поддержки]"
+        elif message.video:
+            reply_text = "[Видео от поддержки]"
+        elif message.document:
+            reply_text = "[Файл от поддержки]"
+        elif message.voice:
+            reply_text = "[Голосовое сообщение от поддержки]"
+        elif message.sticker:
+            reply_text = "[Стикер от поддержки]"
+        else:
+            reply_text = "[Сообщение от поддержки]"
+
+    try:
+        await bot.send_message(user_id, f"🔔 Новое сообщение от поддержки\n\n{reply_text}")
+    except TelegramAPIError:
+        logging.exception("Failed to deliver support reply to user_id=%s", user_id)
+
 
 
 async def app_page(_: web.Request) -> web.Response:

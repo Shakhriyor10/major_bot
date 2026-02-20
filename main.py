@@ -23,7 +23,7 @@ from aiogram.types import (
 
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
-SUPPORT_GROUP_ID = -1003739992037
+SUPPORT_GROUP_ID = -1005184011602
 ADMIN_IDS = {
     int(user_id.strip())
     for user_id in os.getenv("ADMIN_IDS", "8598163827").split(",")

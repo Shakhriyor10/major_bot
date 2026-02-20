@@ -90,9 +90,8 @@ async function loadCar() {
         <h1 class="car-title">${car.title}</h1>
         <p class="price">${formatPrice(car.price, car.currency)}</p>
         <ul class="feature-list">
-          <li><b>Автосалон:</b> ${car.dealership_name || 'Не указан'}</li>
           <li><b>Марка:</b> ${car.brand || 'Без марки'}</li>
-          <li><b>Объем двигателя:</b> ${car.engine}</li>
+          <li><b>Двигатель:</b> ${car.engine}</li>
         </ul>
       </div>
     </article>

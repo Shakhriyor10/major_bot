@@ -260,9 +260,8 @@ function renderCars() {
       <img src="${car.image_url}" alt="${car.title}" />
       <div class="card-body">
         <h3 class="car-title">${car.title}</h3>
-        <p class="specs">Марка: ${car.brand || 'Без марки'}</p>
         <p class="price">${formatPrice(car.price, car.currency)}</p>
-        <div class="specs">Объем двигателя: ${car.engine}</div>
+        <div class="specs">Двигатель: ${car.engine}</div>
         <button class="btn" onclick="openCar(${car.id})">Подробнее</button>
         ${isAdminUser ? `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>` : ''}
       </div>

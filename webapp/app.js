@@ -36,6 +36,8 @@ function showMenu() {
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
+  toggleLocationBtn.setAttribute('aria-expanded', 'false');
+  toggleLocationBtn.classList.remove('expanded');
 }
 
 function openCars() {
@@ -52,6 +54,16 @@ function openSupport() {
   supportSection.classList.remove('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
+}
+
+function openLocation() {
+  menuSection.classList.add('hidden');
+  carsSection.classList.add('hidden');
+  supportSection.classList.add('hidden');
+  adminBox.classList.add('hidden');
+  locationSection.classList.remove('hidden');
+  toggleLocationBtn.setAttribute('aria-expanded', 'true');
+  toggleLocationBtn.classList.add('expanded');
 }
 
 function renderBrandFilter(cars) {
@@ -183,21 +195,11 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
 
 
 toggleLocationBtn.addEventListener('click', () => {
-  menuSection.classList.remove('hidden');
-  carsSection.classList.add('hidden');
-  supportSection.classList.add('hidden');
-  adminBox.classList.add('hidden');
-
-  const isOpen = !locationSection.classList.contains('hidden');
-  locationSection.classList.toggle('hidden', isOpen);
-  toggleLocationBtn.setAttribute('aria-expanded', String(!isOpen));
-  toggleLocationBtn.classList.toggle('expanded', !isOpen);
+  openLocation();
 });
 
 closeLocationBtn.addEventListener('click', () => {
-  locationSection.classList.add('hidden');
-  toggleLocationBtn.setAttribute('aria-expanded', 'false');
-  toggleLocationBtn.classList.remove('expanded');
+  showMenu();
 });
 
 document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {

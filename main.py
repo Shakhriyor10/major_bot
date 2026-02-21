@@ -23,9 +23,10 @@ from aiogram.types import (
     WebAppInfo,
 )
 
-BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
-WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
-SUPPORT_GROUP_ID = -1005184011602
+BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
+WEBAPP_BASE_URL = "https://app.majormotors.uz"
+# WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
+SUPPORT_GROUP_ID = -1003739992037
 ADMIN_IDS = {
     int(user_id.strip())
     for user_id in os.getenv("ADMIN_IDS", "8598163827").split(",")

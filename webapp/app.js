@@ -15,6 +15,8 @@ const submenuSection = document.getElementById('submenuSection');
 const pageTitleText = document.getElementById('pageTitleText');
 const pageTitleLogo = document.getElementById('pageTitleLogo');
 const carsSection = document.getElementById('carsSection');
+const carDetailsSection = document.getElementById('carDetailsSection');
+const carDetailsContent = document.getElementById('carDetailsContent');
 const supportSection = document.getElementById('supportSection');
 const locationSection = document.getElementById('locationSection');
 const adminBox = document.getElementById('adminBox');
@@ -71,10 +73,16 @@ function formatPrice(value, currency = 'UZS') {
   return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
 }
 
+function closeCarDetails() {
+  carDetailsSection.classList.add('hidden');
+  carDetailsContent.innerHTML = '';
+}
+
 function openDealershipList() {
   dealershipSection.classList.remove('hidden');
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -88,6 +96,7 @@ function openSubmenu() {
   dealershipSection.classList.add('hidden');
   submenuSection.classList.remove('hidden');
   carsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -98,6 +107,7 @@ function openSubmenu() {
 function openCars() {
   submenuSection.classList.add('hidden');
   carsSection.classList.remove('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   if (isAdminUser) adminBox.classList.remove('hidden');
@@ -107,6 +117,7 @@ function openCars() {
 function openSupport() {
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.remove('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -116,10 +127,40 @@ function openSupport() {
 function openLocation() {
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.remove('hidden');
   adminBox.classList.add('hidden');
   updateSocialBar();
+}
+
+function getYoutubeEmbedUrl(rawUrl) {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(value.includes('://') ? value : `https://${value}`);
+  } catch (_) {
+    return '';
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+  let videoId = '';
+
+  if (host === 'youtu.be') {
+    videoId = pathParts[0] || '';
+  } else if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+    videoId = parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('vi') || '';
+    if (!videoId && pathParts.length >= 2 && ['embed', 'shorts', 'live', 'v'].includes(pathParts[0])) {
+      videoId = pathParts[1];
+    }
+  }
+
+  videoId = videoId.replace(/[^A-Za-z0-9_-]/g, '');
+  if (videoId.length < 6) return '';
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
 }
 
 
@@ -258,6 +299,20 @@ function renderCardCarousel(car) {
   `;
 }
 
+function renderCarMedia(car) {
+  const videoUrl = normalizeExternalUrl(car.video_url);
+  if (!videoUrl) {
+    return renderCardCarousel(car);
+  }
+
+  const embedUrl = getYoutubeEmbedUrl(videoUrl);
+  if (embedUrl) {
+    return `<iframe class="car-media-frame" src="${embedUrl}" title="Видео автомобиля" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe>`;
+  }
+
+  return renderCardCarousel(car);
+}
+
 function initCarousels(root = document) {
   root.querySelectorAll('[data-carousel]').forEach((carousel) => {
     const track = carousel.querySelector('[data-carousel-track]');
@@ -361,9 +416,53 @@ async function loadCars() {
   renderCars();
 }
 
-window.openCar = (id) => {
-  window.location.href = `/car?id=${id}&tg_id=${tgId}`;
+window.openCar = async (id) => {
+  const res = await fetch(`/api/cars/${id}?tg_id=${tgId}`);
+  if (!res.ok) return;
+
+  const car = await res.json();
+  closeCarDetails();
+  carDetailsContent.innerHTML = `
+    <article class="card car-details-card">
+      ${renderCarMedia(car)}
+      <div class="card-body">
+        <h1 class="car-title">${car.title}</h1>
+        <p class="price">${formatPrice(car.price, car.currency)}</p>
+        <ul class="feature-list">
+          <li><b>Марка:</b> ${car.brand || 'Без марки'}</li>
+          <li><b>Двигатель:</b> ${car.engine}</li>
+        </ul>
+      </div>
+    </article>
+    <section class="description-box">
+      <h2 class="description-title">Подробное описание</h2>
+      <p id="carDetailsDescriptionText" class="description-text"></p>
+    </section>
+  `;
+
+  const descriptionNode = document.getElementById('carDetailsDescriptionText');
+  if (descriptionNode) {
+    descriptionNode.textContent = String(car.description || '');
+  }
+
+  carsSection.classList.add('hidden');
+  adminBox.classList.add('hidden');
+  carDetailsSection.classList.remove('hidden');
+  initCarousels(carDetailsSection);
+  updateSocialBar();
+  window.history.pushState({ screen: 'carDetails', carId: id }, '', `#car-${id}`);
 };
+
+function openCarsFromDetails({ fromPopState = false } = {}) {
+  closeCarDetails();
+  carsSection.classList.remove('hidden');
+  if (isAdminUser) {
+    adminBox.classList.remove('hidden');
+  }
+  if (!fromPopState && window.location.hash.startsWith('#car-')) {
+    window.history.back();
+  }
+}
 
 window.fillEdit = async (id) => {
   const res = await fetch(`/api/cars/${id}?tg_id=${tgId}`);
@@ -553,10 +652,21 @@ document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {
 
 document.getElementById('backToDealerships').addEventListener('click', openDealershipList);
 document.getElementById('backToSubmenuFromCars').addEventListener('click', openSubmenu);
+document.getElementById('backToCarsFromDetails').addEventListener('click', () => openCarsFromDetails());
 document.getElementById('backToSubmenuFromSupport').addEventListener('click', openSubmenu);
 document.getElementById('backToSubmenuFromLocation').addEventListener('click', openSubmenu);
 carSearchInput.addEventListener('input', renderCars);
 brandFilterSelect.addEventListener('change', renderCars);
+
+window.addEventListener('popstate', () => {
+  if (window.location.hash.startsWith('#car-')) {
+    return;
+  }
+
+  if (!carDetailsSection.classList.contains('hidden')) {
+    openCarsFromDetails({ fromPopState: true });
+  }
+});
 
 (async () => {
   const splashPromise = playStartupSplash();

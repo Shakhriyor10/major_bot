@@ -15,6 +15,8 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
@@ -494,22 +496,21 @@ def save_uploaded_image(raw_data: bytes, original_name: str = "") -> str:
 
 @router.message(Command("start"))
 async def start_cmd(message: Message) -> None:
-    existing_phone = get_user_phone(message.from_user.id)
-    if existing_phone:
-        kb = build_main_keyboard(message.from_user.id)
-        await message.answer(
-            "Вы уже зарегистрированы ✅\nМожно сразу открыть приложение.",
-            reply_markup=kb,
-        )
-        return
-
-    kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=SEND_CONTACT_BUTTON_TEXT, request_contact=True)]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
+    webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🚘 Открыть приложение",
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            ]
+        ]
     )
     await message.answer(
-        "Добро пожаловать в автосалон 🚗\nЧтобы начать, отправьте номер телефона.",
+        "👋 Добро пожаловать в Major Samarkand!\n\n"
+        "Автомобили в наличии, актуальные цены, тест-драйв и консультация — всё доступно прямо здесь. 🚘\n"
+        "Выбирайте с комфортом.",
         reply_markup=kb,
     )
 

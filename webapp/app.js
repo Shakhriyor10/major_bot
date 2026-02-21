@@ -302,7 +302,7 @@ window.fillEdit = async (id) => {
   const car = await res.json();
   document.getElementById('carId').value = car.id;
   dealershipSelect.value = String(car.dealership_id || 1);
-  document.getElementById('position').value = car.position || 1000;
+  document.getElementById('position').value = car.position || '';
   document.getElementById('brand').value = car.brand || '';
   document.getElementById('title').value = car.title;
   document.getElementById('price').value = car.price;
@@ -355,7 +355,7 @@ adminForm.addEventListener('submit', async (e) => {
     const payload = {
       tg_id: tgId,
       dealership_id: Number(dealershipSelect.value),
-      position: Number(document.getElementById('position').value),
+      position: document.getElementById('position').value.trim(),
       brand: document.getElementById('brand').value.trim(),
       title: document.getElementById('title').value.trim(),
       price: document.getElementById('price').value.trim(),

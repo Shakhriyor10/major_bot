@@ -41,7 +41,7 @@ router = Router()
 
 ADD_CAR_STEPS = [
     ("dealership", "Введите автосалон (ID, slug или название):"),
-    ("position", "Введите позицию в списке (число, где 1 — самый верх):"),
+    ("position", "Введите позицию в списке (число, можно "-" для авто):"),
     ("brand", "Введите марку автомобиля (например: BMW):"),
     ("title", "Введите название автомобиля (например: BMW X5 2022):"),
     ("price", "Введите цену (только число, например: 59000):"),
@@ -327,6 +327,17 @@ def normalize_position(raw_value: str) -> int | None:
     return position
 
 
+def resolve_position(raw_value: Any, default: int = 1000) -> int | None:
+    value = str(raw_value or "").strip()
+    if value in {"", "-"}:
+        return default
+
+    position = normalize_position(value)
+    if not position:
+        return None
+    return position
+
+
 def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -338,7 +349,7 @@ def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
             FROM cars
             LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
             WHERE cars.dealership_id=?
-            ORDER BY cars.position ASC, cars.id DESC
+            ORDER BY COALESCE(cars.position, 1000) ASC, cars.id DESC
             """,
             (dealership_id,),
         )
@@ -348,7 +359,7 @@ def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
             SELECT cars.*, dealerships.name AS dealership_name
             FROM cars
             LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
-            ORDER BY cars.position ASC, cars.id DESC
+            ORDER BY COALESCE(cars.position, 1000) ASC, cars.id DESC
             """
         )
     items = [dict(row) for row in cur.fetchall()]
@@ -492,17 +503,17 @@ def _required_text(payload: dict[str, Any], key: str) -> str:
 
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     dealership_id_raw = _required_text(payload, "dealership_id")
-    position_raw = _required_text(payload, "position")
+    position_raw = payload.get("position", "")
     currency_raw = _required_text(payload, "currency")
     dealership_id = resolve_dealership_id(dealership_id_raw)
-    position = normalize_position(position_raw)
+    position = resolve_position(position_raw)
     currency = normalize_currency(currency_raw)
     brand = _required_text(payload, "brand")
     title = _required_text(payload, "title")
     price = _required_text(payload, "price")
     engine = _required_text(payload, "engine")
     description = _required_text(payload, "description")
-    if not all([brand, title, price, engine, description, dealership_id, currency, position]):
+    if not all([brand, title, price, engine, description, dealership_id, currency]):
         return None
 
     image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
@@ -665,13 +676,16 @@ async def addcar_cmd(message: Message) -> None:
     payload = (message.text or "").replace("/addcar", "", 1).strip()
     if payload:
         parts = [p.strip() for p in payload.split("|")]
-        if len(parts) != 13:
+        if len(parts) not in {12, 13}:
             await message.answer(
-                "Формат:\n/addcar dealership_id | position | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
+                "Формат:\n/addcar dealership_id | [position] | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
             )
             return
+        if len(parts) == 12:
+            parts.insert(1, "")
+
         parts[0] = str(resolve_dealership_id(parts[0]) or "")
-        parts[1] = str(normalize_position(parts[1]) or "")
+        parts[1] = str(resolve_position(parts[1]) or "")
         parts[5] = normalize_currency(parts[5]) or ""
         if not parts[0] or not parts[1] or not parts[5]:
             await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
@@ -754,10 +768,10 @@ async def addcar_step_handler(message: Message) -> None:
         draft[key] = normalized
 
     if key == "position":
-        normalized = normalize_position(draft[key])
+        normalized = resolve_position(draft[key])
         if not normalized:
             draft.pop(key, None)
-            await message.answer("❌ Позиция должна быть целым числом больше 0.")
+            await message.answer("❌ Позиция должна быть целым числом больше 0 или '-'.")
             return
         draft[key] = str(normalized)
 
@@ -799,13 +813,19 @@ async def editcar_cmd(message: Message) -> None:
         return
     payload = message.text.replace("/editcar", "", 1).strip()
     parts = [p.strip() for p in payload.split("|")]
-    if len(parts) != 14 or not parts[0].isdigit():
+    if len(parts) not in {13, 14} or not parts[0].isdigit():
         await message.answer(
-            "Формат:\n/editcar id | dealership_id | position | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
+            "Формат:\n/editcar id | dealership_id | [position] | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
         )
         return
+
+    if len(parts) == 13:
+        existing_car = get_car(int(parts[0]))
+        position_value = str((existing_car or {}).get("position") or 1000)
+        parts.insert(2, position_value)
+
     parts[1] = str(resolve_dealership_id(parts[1]) or "")
-    parts[2] = str(normalize_position(parts[2]) or "")
+    parts[2] = str(resolve_position(parts[2]) or "")
     parts[6] = normalize_currency(parts[6]) or ""
     if not parts[1] or not parts[2] or not parts[6]:
         await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")

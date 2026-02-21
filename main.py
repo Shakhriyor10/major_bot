@@ -248,14 +248,18 @@ def build_contact_keyboard() -> ReplyKeyboardMarkup:
 
 async def send_welcome_message(message: Message) -> None:
     webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
-    kb = InlineKeyboardMarkup(
+    inline_kb = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=OPEN_APP_BUTTON_TEXT, web_app=WebAppInfo(url=webapp_url))]]
     )
     await message.answer(
         "👋 Добро пожаловать в Major Samarkand!\n\n"
         "Автомобили в наличии, актуальные цены, тест-драйв и консультация — всё доступно прямо здесь. 🚘\n"
         "Выбирайте с комфортом.",
-        reply_markup=kb,
+        reply_markup=inline_kb,
+    )
+    await message.answer(
+        "⬇️ Также можете открыть приложение кнопкой внизу.",
+        reply_markup=build_main_keyboard(message.from_user.id),
     )
 
 

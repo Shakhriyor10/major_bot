@@ -237,6 +237,27 @@ def build_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
+def build_contact_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=SEND_CONTACT_BUTTON_TEXT, request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+async def send_welcome_message(message: Message) -> None:
+    webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=OPEN_APP_BUTTON_TEXT, web_app=WebAppInfo(url=webapp_url))]]
+    )
+    await message.answer(
+        "👋 Добро пожаловать в Major Samarkand!\n\n"
+        "Автомобили в наличии, актуальные цены, тест-драйв и консультация — всё доступно прямо здесь. 🚘\n"
+        "Выбирайте с комфортом.",
+        reply_markup=kb,
+    )
+
+
 def count_users() -> int:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -497,22 +518,13 @@ def save_uploaded_image(raw_data: bytes, original_name: str = "") -> str:
 
 @router.message(Command("start"))
 async def start_cmd(message: Message) -> None:
-    webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🚘 Открыть приложение",
-                    web_app=WebAppInfo(url=webapp_url),
-                )
-            ]
-        ]
-    )
+    if get_user_phone(message.from_user.id):
+        await send_welcome_message(message)
+        return
+
     await message.answer(
-        "👋 Добро пожаловать в Major Samarkand!\n\n"
-        "Автомобили в наличии, актуальные цены, тест-драйв и консультация — всё доступно прямо здесь. 🚘\n"
-        "Выбирайте с комфортом.",
-        reply_markup=kb,
+        "Для продолжения отправьте ваш номер телефона кнопкой ниже.",
+        reply_markup=build_contact_keyboard(),
     )
 
 
@@ -523,11 +535,7 @@ async def handle_contact(message: Message) -> None:
         return
 
     save_user(message, message.contact.phone_number)
-    kb = build_main_keyboard(message.from_user.id)
-    await message.answer(
-        "Спасибо! Данные сохранены. Теперь можно открыть приложение.",
-        reply_markup=kb,
-    )
+    await send_welcome_message(message)
 
 
 @router.message(F.chat.type == "private", F.text == ADMIN_STATS_BUTTON_TEXT)
@@ -1046,9 +1054,10 @@ async def api_support(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "group_not_set"}, status=500)
 
     user_display = get_user_display(user_id)
+    user_phone = get_user_phone(user_id) or "Не указан"
     sent = await bot.send_message(
         SUPPORT_GROUP_ID,
-        f"🆘 Новое обращение\nПользователь: {user_display}\nID: <code>{user_id}</code>\nАвтосалон: {dealership_name or 'Не выбран'}\nСообщение: {message}",
+        f"🆘 Новое обращение\nПользователь: {user_display}\nID: <code>{user_id}</code>\nТелефон: <code>{user_phone}</code>\nАвтосалон: {dealership_name or 'Не выбран'}\nСообщение: {message}",
     )
     save_support_map(sent.message_id, user_id)
     return web.json_response({"ok": True})

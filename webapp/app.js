@@ -9,6 +9,9 @@ if (tg) {
 
 const params = new URLSearchParams(window.location.search);
 const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
+const initialDealershipId = Number(params.get('dealership_id') || 0);
+const initialView = (params.get('view') || '').trim();
+const skipStartupSplash = params.get('no_splash') === '1' || initialView === 'cars';
 
 const dealershipSection = document.getElementById('dealershipSection');
 const submenuSection = document.getElementById('submenuSection');
@@ -46,7 +49,7 @@ function playStartupSplash() {
   }
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduceMotion) {
+  if (reduceMotion || skipStartupSplash) {
     splash.classList.add('is-hidden');
     document.body.classList.remove('app-loading');
     document.body.classList.add('app-ready');
@@ -293,7 +296,8 @@ async function loadCars() {
 }
 
 window.openCar = (id) => {
-  window.location.href = `/car?id=${id}&tg_id=${tgId}`;
+  const dealershipPart = currentDealership?.id ? `&dealership_id=${currentDealership.id}` : '';
+  window.location.href = `/car?id=${id}&tg_id=${tgId}${dealershipPart}`;
 };
 
 window.fillEdit = async (id) => {
@@ -476,7 +480,25 @@ brandFilterSelect.addEventListener('change', renderCars);
   }
 
   await loadDealerships();
-  openDealershipList();
+  if (initialDealershipId) {
+    currentDealership = dealerships.find((item) => item.id === initialDealershipId) || null;
+    if (currentDealership) {
+      updateHeaderTitle();
+      fillLocation();
+      fillDealershipDescription();
+      await loadCars();
+
+      if (initialView === 'cars') {
+        openCars();
+      } else {
+        openSubmenu();
+      }
+    } else {
+      openDealershipList();
+    }
+  } else {
+    openDealershipList();
+  }
   updateSocialBar();
   await splashPromise;
 })();

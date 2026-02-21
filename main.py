@@ -50,6 +50,13 @@ ADD_CAR_STEPS = [
     ("video_url", "Введите ссылку на видео (YouTube, можно '-' если без видео):"),
 ]
 ADMIN_CAR_DRAFTS: dict[int, dict[str, str]] = {}
+ADMIN_BROADCAST_STATE: dict[int, bool] = {}
+
+OPEN_APP_BUTTON_TEXT = "🚘 Открыть приложение"
+SEND_CONTACT_BUTTON_TEXT = "📱 Отправить номер"
+ADMIN_STATS_BUTTON_TEXT = "📊 Статистика"
+ADMIN_BROADCAST_BUTTON_TEXT = "📣 Рассылка"
+MAX_BROADCAST_FILE_SIZE = 15 * 1024 * 1024
 
 DEFAULT_DEALERSHIPS = [
     {
@@ -217,6 +224,32 @@ def get_user_phone(tg_id: int) -> str | None:
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
+
+
+def build_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
+    webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={user_id}"
+    rows = [[KeyboardButton(text=OPEN_APP_BUTTON_TEXT, web_app=WebAppInfo(url=webapp_url))]]
+    if is_admin(user_id):
+        rows.append([KeyboardButton(text=ADMIN_STATS_BUTTON_TEXT), KeyboardButton(text=ADMIN_BROADCAST_BUTTON_TEXT)])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+
+def count_users() -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users")
+    total = int(cur.fetchone()[0])
+    conn.close()
+    return total
+
+
+def list_user_ids() -> list[int]:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT tg_id FROM users ORDER BY id ASC")
+    user_ids = [int(row[0]) for row in cur.fetchall()]
+    conn.close()
+    return user_ids
 
 
 def list_dealerships() -> list[dict[str, Any]]:
@@ -463,11 +496,7 @@ def save_uploaded_image(raw_data: bytes, original_name: str = "") -> str:
 async def start_cmd(message: Message) -> None:
     existing_phone = get_user_phone(message.from_user.id)
     if existing_phone:
-        webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
-        kb = ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(text="🚘 Открыть приложение", web_app=WebAppInfo(url=webapp_url))]],
-            resize_keyboard=True,
-        )
+        kb = build_main_keyboard(message.from_user.id)
         await message.answer(
             "Вы уже зарегистрированы ✅\nМожно сразу открыть приложение.",
             reply_markup=kb,
@@ -475,7 +504,7 @@ async def start_cmd(message: Message) -> None:
         return
 
     kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📱 Отправить номер", request_contact=True)]],
+        keyboard=[[KeyboardButton(text=SEND_CONTACT_BUTTON_TEXT, request_contact=True)]],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
@@ -492,14 +521,110 @@ async def handle_contact(message: Message) -> None:
         return
 
     save_user(message, message.contact.phone_number)
-    webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
-    kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🚘 Открыть приложение", web_app=WebAppInfo(url=webapp_url))]],
-        resize_keyboard=True,
-    )
+    kb = build_main_keyboard(message.from_user.id)
     await message.answer(
         "Спасибо! Данные сохранены. Теперь можно открыть приложение.",
         reply_markup=kb,
+    )
+
+
+@router.message(F.chat.type == "private", F.text == ADMIN_STATS_BUTTON_TEXT)
+async def admin_stats_handler(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        return
+    total_users = count_users()
+    await message.answer(f"👥 Всего пользователей: {total_users}")
+
+
+@router.message(F.chat.type == "private", F.text == ADMIN_BROADCAST_BUTTON_TEXT)
+async def admin_broadcast_start_handler(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        return
+    ADMIN_BROADCAST_STATE[message.from_user.id] = True
+    await message.answer(
+        "Отправьте сообщение для рассылки. Поддерживаются:\n"
+        "• текст\n"
+        "• фото (до 15 МБ)\n"
+        "• видео (до 15 МБ)\n\n"
+        "Для отмены отправьте /cancelbroadcast"
+    )
+
+
+@router.message(Command("cancelbroadcast"))
+async def cancel_broadcast_cmd(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        return
+    if ADMIN_BROADCAST_STATE.pop(message.from_user.id, None):
+        await message.answer("Рассылка отменена.")
+        return
+    await message.answer("Активной рассылки нет.")
+
+
+async def send_broadcast_message(bot: Bot, source_message: Message, user_id: int) -> bool:
+    try:
+        if source_message.text and not source_message.photo and not source_message.video:
+            await bot.send_message(user_id, source_message.text)
+        else:
+            await bot.copy_message(
+                chat_id=user_id,
+                from_chat_id=source_message.chat.id,
+                message_id=source_message.message_id,
+                reply_markup=None,
+            )
+        return True
+    except (TelegramForbiddenError, TelegramBadRequest):
+        return False
+
+
+@router.message(F.chat.type == "private")
+async def admin_broadcast_message_handler(message: Message, bot: Bot) -> None:
+    if not is_admin(message.from_user.id):
+        return
+    if not ADMIN_BROADCAST_STATE.get(message.from_user.id):
+        return
+    if message.text and message.text.startswith("/"):
+        return
+
+    if not (message.text or message.photo or message.video):
+        await message.answer("Поддерживаются только текст, фото или видео.")
+        return
+
+    if message.photo:
+        file_size = message.photo[-1].file_size or 0
+        if file_size > MAX_BROADCAST_FILE_SIZE:
+            await message.answer("Фото больше 15 МБ. Отправьте файл меньшего размера.")
+            return
+    if message.video:
+        file_size = message.video.file_size or 0
+        if file_size > MAX_BROADCAST_FILE_SIZE:
+            await message.answer("Видео больше 15 МБ. Отправьте файл меньшего размера.")
+            return
+
+    ADMIN_BROADCAST_STATE.pop(message.from_user.id, None)
+    user_ids = list_user_ids()
+    if not user_ids:
+        await message.answer("В базе нет пользователей для рассылки.")
+        return
+
+    success_ids: list[int] = []
+    failed_ids: list[int] = []
+    for user_id in user_ids:
+        ok = await send_broadcast_message(bot, message, user_id)
+        if ok:
+            success_ids.append(user_id)
+        else:
+            failed_ids.append(user_id)
+
+    failed_preview = ", ".join(str(user_id) for user_id in failed_ids[:30])
+    failed_suffix = "" if len(failed_ids) <= 30 else ", ..."
+    details = (
+        f"\n❌ Ошибки ({len(failed_ids)}): {failed_preview}{failed_suffix}" if failed_ids else "\n✅ Ошибок нет"
+    )
+    await message.answer(
+        "📣 Рассылка завершена.\n"
+        f"✅ Успешно: {len(success_ids)}\n"
+        f"❌ Ошибка: {len(failed_ids)}"
+        f"{details}"
     )
 
 

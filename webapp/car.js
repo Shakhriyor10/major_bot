@@ -84,7 +84,7 @@ async function loadCar() {
 
   const car = await res.json();
   const backLink = dealershipId
-    ? `/app?tg_id=${tgId}&dealership_id=${dealershipId}&view=cars`
+    ? `/app?tg_id=${tgId}&dealership_id=${dealershipId}&view=cars&no_splash=1`
     : `/app?tg_id=${tgId}`;
   root.innerHTML = `
     <a href="${backLink}" class="back">← Назад к каталогу</a>

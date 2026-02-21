@@ -51,11 +51,14 @@ ADD_CAR_STEPS = [
 ]
 ADMIN_CAR_DRAFTS: dict[int, dict[str, str]] = {}
 ADMIN_BROADCAST_STATE: dict[int, bool] = {}
+ADMIN_BROADCAST_DRAFTS: dict[int, tuple[int, int]] = {}
 
 OPEN_APP_BUTTON_TEXT = "🚘 Открыть приложение"
 SEND_CONTACT_BUTTON_TEXT = "📱 Отправить номер"
 ADMIN_STATS_BUTTON_TEXT = "📊 Статистика"
 ADMIN_BROADCAST_BUTTON_TEXT = "📣 Рассылка"
+BROADCAST_CONFIRM_YES_TEXT = "Yes"
+BROADCAST_CONFIRM_NO_TEXT = "No"
 MAX_BROADCAST_FILE_SIZE = 15 * 1024 * 1024
 
 DEFAULT_DEALERSHIPS = [
@@ -541,12 +544,15 @@ async def admin_broadcast_start_handler(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return
     ADMIN_BROADCAST_STATE[message.from_user.id] = True
+    ADMIN_BROADCAST_DRAFTS.pop(message.from_user.id, None)
     await message.answer(
-        "Отправьте сообщение для рассылки. Поддерживаются:\n"
-        "• текст\n"
-        "• фото (до 15 МБ)\n"
-        "• видео (до 15 МБ)\n\n"
-        "Для отмены отправьте /cancelbroadcast"
+        """Отправьте сообщение для рассылки. Поддерживаются:
+• текст
+• фото (до 15 МБ)
+• видео (до 15 МБ)
+
+После отправки нужно подтвердить Yes/No.
+Для отмены отправьте /cancelbroadcast"""
     )
 
 
@@ -554,23 +560,22 @@ async def admin_broadcast_start_handler(message: Message) -> None:
 async def cancel_broadcast_cmd(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return
-    if ADMIN_BROADCAST_STATE.pop(message.from_user.id, None):
+    had_state = ADMIN_BROADCAST_STATE.pop(message.from_user.id, None)
+    had_draft = ADMIN_BROADCAST_DRAFTS.pop(message.from_user.id, None)
+    if had_state or had_draft:
         await message.answer("Рассылка отменена.")
         return
     await message.answer("Активной рассылки нет.")
 
 
-async def send_broadcast_message(bot: Bot, source_message: Message, user_id: int) -> bool:
+async def send_broadcast_message(bot: Bot, source_chat_id: int, source_message_id: int, user_id: int) -> bool:
     try:
-        if source_message.text and not source_message.photo and not source_message.video:
-            await bot.send_message(user_id, source_message.text)
-        else:
-            await bot.copy_message(
-                chat_id=user_id,
-                from_chat_id=source_message.chat.id,
-                message_id=source_message.message_id,
-                reply_markup=None,
-            )
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=source_chat_id,
+            message_id=source_message_id,
+            reply_markup=None,
+        )
         return True
     except (TelegramForbiddenError, TelegramBadRequest):
         return False
@@ -583,6 +588,46 @@ async def admin_broadcast_message_handler(message: Message, bot: Bot) -> None:
     if not ADMIN_BROADCAST_STATE.get(message.from_user.id):
         return
     if message.text and message.text.startswith("/"):
+        return
+
+    admin_id = message.from_user.id
+    current_draft = ADMIN_BROADCAST_DRAFTS.get(admin_id)
+
+    if current_draft and message.text in {BROADCAST_CONFIRM_YES_TEXT, BROADCAST_CONFIRM_NO_TEXT}:
+        if message.text == BROADCAST_CONFIRM_NO_TEXT:
+            ADMIN_BROADCAST_STATE.pop(admin_id, None)
+            ADMIN_BROADCAST_DRAFTS.pop(admin_id, None)
+            await message.answer("Рассылка отменена.")
+            return
+
+        user_ids = list_user_ids()
+        if not user_ids:
+            ADMIN_BROADCAST_STATE.pop(admin_id, None)
+            ADMIN_BROADCAST_DRAFTS.pop(admin_id, None)
+            await message.answer("В базе нет пользователей для рассылки.")
+            return
+
+        source_chat_id, source_message_id = current_draft
+        success_ids: list[int] = []
+        failed_ids: list[int] = []
+        for user_id in user_ids:
+            ok = await send_broadcast_message(bot, source_chat_id, source_message_id, user_id)
+            if ok:
+                success_ids.append(user_id)
+            else:
+                failed_ids.append(user_id)
+
+        ADMIN_BROADCAST_STATE.pop(admin_id, None)
+        ADMIN_BROADCAST_DRAFTS.pop(admin_id, None)
+
+        failed_preview = ", ".join(str(user_id) for user_id in failed_ids[:30])
+        failed_suffix = "" if len(failed_ids) <= 30 else ", ..."
+        details = (
+            f"\n❌ Ошибки ({len(failed_ids)}): {failed_preview}{failed_suffix}" if failed_ids else "\n✅ Ошибок нет"
+        )
+        await message.answer(
+            f"📣 Рассылка завершена.\n✅ Успешно: {len(success_ids)}\n❌ Ошибка: {len(failed_ids)}{details}"
+        )
         return
 
     if not (message.text or message.photo or message.video):
@@ -600,32 +645,13 @@ async def admin_broadcast_message_handler(message: Message, bot: Bot) -> None:
             await message.answer("Видео больше 15 МБ. Отправьте файл меньшего размера.")
             return
 
-    ADMIN_BROADCAST_STATE.pop(message.from_user.id, None)
-    user_ids = list_user_ids()
-    if not user_ids:
-        await message.answer("В базе нет пользователей для рассылки.")
-        return
-
-    success_ids: list[int] = []
-    failed_ids: list[int] = []
-    for user_id in user_ids:
-        ok = await send_broadcast_message(bot, message, user_id)
-        if ok:
-            success_ids.append(user_id)
-        else:
-            failed_ids.append(user_id)
-
-    failed_preview = ", ".join(str(user_id) for user_id in failed_ids[:30])
-    failed_suffix = "" if len(failed_ids) <= 30 else ", ..."
-    details = (
-        f"\n❌ Ошибки ({len(failed_ids)}): {failed_preview}{failed_suffix}" if failed_ids else "\n✅ Ошибок нет"
+    ADMIN_BROADCAST_DRAFTS[admin_id] = (message.chat.id, message.message_id)
+    confirm_kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=BROADCAST_CONFIRM_YES_TEXT), KeyboardButton(text=BROADCAST_CONFIRM_NO_TEXT)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
     )
-    await message.answer(
-        "📣 Рассылка завершена.\n"
-        f"✅ Успешно: {len(success_ids)}\n"
-        f"❌ Ошибка: {len(failed_ids)}"
-        f"{details}"
-    )
+    await message.answer("Подтвердите отправку рассылки: Yes / No", reply_markup=confirm_kb)
 
 
 @router.message(Command("addcar"))

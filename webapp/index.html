@@ -125,8 +125,20 @@
         </select>
         <input id="engine" placeholder="Объем двигателя" required />
         <textarea id="description" placeholder="Описание" required></textarea>
-        <input type="file" id="image_file" accept="image/*" />
-        <input id="image_url" placeholder="Ссылка на фото (заполнится автоматически при загрузке)" />
+        <input type="file" id="image_file_1" accept="image/*" />
+        <input type="file" id="image_file_2" accept="image/*" />
+        <input type="file" id="image_file_3" accept="image/*" />
+        <input type="file" id="image_file_4" accept="image/*" />
+        <input type="file" id="image_file_5" accept="image/*" />
+        <input id="image_url" placeholder="Ссылка на фото 1 (заполнится автоматически при загрузке)" />
+        <input id="image_url_2" placeholder="Ссылка на фото 2 (необязательно)" />
+        <input id="image_url_3" placeholder="Ссылка на фото 3 (необязательно)" />
+        <input id="image_url_4" placeholder="Ссылка на фото 4 (необязательно)" />
+        <input id="image_url_5" placeholder="Ссылка на фото 5 (необязательно)" />
+        <select id="is_active">
+          <option value="1">Активный</option>
+          <option value="0">Неактивный</option>
+        </select>
         <input id="video_url" placeholder="Ссылка на видео (YouTube, необязательно)" />
         <div class="admin-actions">
           <button type="submit" class="btn">Сохранить</button>

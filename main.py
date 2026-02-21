@@ -156,7 +156,12 @@ def init_db() -> None:
             transmission TEXT NOT NULL,
             description TEXT NOT NULL,
             image_url TEXT NOT NULL,
+            image_url_2 TEXT NOT NULL DEFAULT '',
+            image_url_3 TEXT NOT NULL DEFAULT '',
+            image_url_4 TEXT NOT NULL DEFAULT '',
+            image_url_5 TEXT NOT NULL DEFAULT '',
             video_url TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
             position INTEGER NOT NULL DEFAULT 1000,
             created_at TEXT NOT NULL
         )
@@ -171,6 +176,16 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN currency TEXT NOT NULL DEFAULT 'UZS'")
     if "video_url" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN video_url TEXT NOT NULL DEFAULT ''")
+    if "image_url_2" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN image_url_2 TEXT NOT NULL DEFAULT ''")
+    if "image_url_3" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN image_url_3 TEXT NOT NULL DEFAULT ''")
+    if "image_url_4" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN image_url_4 TEXT NOT NULL DEFAULT ''")
+    if "image_url_5" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN image_url_5 TEXT NOT NULL DEFAULT ''")
+    if "is_active" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
     if "position" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN position INTEGER NOT NULL DEFAULT 1000")
     dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
@@ -327,45 +342,46 @@ def normalize_position(raw_value: str) -> int | None:
     return position
 
 
-def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
+def list_cars(dealership_id: int | None = None, include_inactive: bool = True) -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+    where_parts: list[str] = []
+    params: list[Any] = []
     if dealership_id:
-        cur.execute(
-            """
-            SELECT cars.*, dealerships.name AS dealership_name
-            FROM cars
-            LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
-            WHERE cars.dealership_id=?
-            ORDER BY cars.position ASC, cars.id DESC
-            """,
-            (dealership_id,),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT cars.*, dealerships.name AS dealership_name
-            FROM cars
-            LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
-            ORDER BY cars.position ASC, cars.id DESC
-            """
-        )
+        where_parts.append("cars.dealership_id=?")
+        params.append(dealership_id)
+    if not include_inactive:
+        where_parts.append("cars.is_active=1")
+
+    where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+
+    cur.execute(
+        f"""
+        SELECT cars.*, dealerships.name AS dealership_name
+        FROM cars
+        LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
+        {where_sql}
+        ORDER BY cars.position ASC, cars.id DESC
+        """,
+        params,
+    )
     items = [dict(row) for row in cur.fetchall()]
     conn.close()
     return items
 
 
-def get_car(car_id: int) -> dict[str, Any] | None:
+def get_car(car_id: int, include_inactive: bool = True) -> dict[str, Any] | None:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+    visibility_filter = "" if include_inactive else " AND cars.is_active=1"
     cur.execute(
-        """
+        f"""
         SELECT cars.*, dealerships.name AS dealership_name
         FROM cars
         LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
-        WHERE cars.id=?
+        WHERE cars.id=?{visibility_filter}
         """,
         (car_id,),
     )
@@ -379,8 +395,12 @@ def add_car(fields: list[str]) -> int:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO cars (dealership_id, position, brand, title, price, currency, year, mileage, engine, transmission, description, image_url, video_url, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cars (
+            dealership_id, position, brand, title, price, currency, year, mileage,
+            engine, transmission, description, image_url, image_url_2, image_url_3,
+            image_url_4, image_url_5, video_url, is_active, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -396,7 +416,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, video_url=?
+        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, is_active=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -490,6 +510,15 @@ def _required_text(payload: dict[str, Any], key: str) -> str:
     return str(payload.get(key, "")).strip()
 
 
+def parse_active_flag(raw_value: Any) -> int:
+    value = str(raw_value).strip().lower()
+    if value in {"", "1", "true", "yes", "on", "active", "активный"}:
+        return 1
+    if value in {"0", "false", "no", "off", "inactive", "неактивный"}:
+        return 0
+    return 1
+
+
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     dealership_id_raw = _required_text(payload, "dealership_id")
     position_raw = _required_text(payload, "position")
@@ -505,8 +534,17 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     if not all([brand, title, price, engine, description, dealership_id, currency, position]):
         return None
 
-    image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
+    image_urls = [
+        _required_text(payload, "image_url"),
+        _required_text(payload, "image_url_2"),
+        _required_text(payload, "image_url_3"),
+        _required_text(payload, "image_url_4"),
+        _required_text(payload, "image_url_5"),
+    ]
+    image_urls[0] = image_urls[0] or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
+
     video_url = _required_text(payload, "video_url")
+    is_active = parse_active_flag(payload.get("is_active", 1))
     return [
         str(dealership_id),
         str(position),
@@ -519,8 +557,13 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         engine,
         "—",
         description,
-        image_url,
+        image_urls[0],
+        image_urls[1],
+        image_urls[2],
+        image_urls[3],
+        image_urls[4],
         video_url,
+        str(is_active),
     ]
 
 
@@ -676,7 +719,7 @@ async def addcar_cmd(message: Message) -> None:
         if not parts[0] or not parts[1] or not parts[5]:
             await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
             return
-        car_id = add_car(parts)
+        car_id = add_car(parts + ["", "", "", "", "1"])
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
         return
 
@@ -786,7 +829,12 @@ async def addcar_step_handler(message: Message) -> None:
         draft["transmission"],
         draft["description"],
         draft["image_url"],
+        "",
+        "",
+        "",
+        "",
         draft["video_url"],
+        "1",
     ]
     car_id = add_car(fields)
     ADMIN_CAR_DRAFTS.pop(message.from_user.id, None)
@@ -810,7 +858,7 @@ async def editcar_cmd(message: Message) -> None:
     if not parts[1] or not parts[2] or not parts[6]:
         await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
         return
-    ok = edit_car(int(parts[0]), parts[1:])
+    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "1"])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")
 
 
@@ -974,7 +1022,9 @@ async def car_page(_: web.Request) -> web.Response:
 
 async def api_cars(request: web.Request) -> web.Response:
     dealership_id = int(request.query.get("dealership_id", "0"))
-    return web.json_response({"cars": list_cars(dealership_id if dealership_id else None)})
+    tg_id = int(request.query.get("tg_id", "0"))
+    include_inactive = is_admin(tg_id)
+    return web.json_response({"cars": list_cars(dealership_id if dealership_id else None, include_inactive=include_inactive)})
 
 
 async def api_dealerships(_: web.Request) -> web.Response:
@@ -1013,7 +1063,8 @@ async def api_manage_dealership(request: web.Request) -> web.Response:
 
 async def api_car(request: web.Request) -> web.Response:
     car_id = int(request.match_info["car_id"])
-    car = get_car(car_id)
+    tg_id = int(request.query.get("tg_id", "0"))
+    car = get_car(car_id, include_inactive=is_admin(tg_id))
     if not car:
         return web.json_response({"error": "not_found"}, status=404)
     return web.json_response(car)

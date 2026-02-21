@@ -15,6 +15,8 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
     KeyboardButton,
     Message,
     ReplyKeyboardMarkup,
@@ -244,7 +246,10 @@ def build_contact_keyboard() -> ReplyKeyboardMarkup:
 
 
 async def send_welcome_message(message: Message) -> None:
-    kb = build_main_keyboard(message.from_user.id)
+    webapp_url = f"{WEBAPP_BASE_URL}/app?tg_id={message.from_user.id}"
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=OPEN_APP_BUTTON_TEXT, web_app=WebAppInfo(url=webapp_url))]]
+    )
     await message.answer(
         "👋 Добро пожаловать в Major Samarkand!\n\n"
         "Автомобили в наличии, актуальные цены, тест-драйв и консультация — всё доступно прямо здесь. 🚘\n"

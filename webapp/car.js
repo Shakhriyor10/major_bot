@@ -7,6 +7,8 @@ if (tg) {
 const params = new URLSearchParams(window.location.search);
 const carId = Number(params.get('id'));
 const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
+const dealershipIdFromQuery = Number(params.get('dealership_id') || 0);
+const returnUrlFromQuery = String(params.get('return_url') || '').trim();
 
 function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
@@ -82,8 +84,14 @@ async function loadCar() {
   }
 
   const car = await res.json();
+  const dealershipId = Number(car.dealership_id || dealershipIdFromQuery || 0);
+  const fallbackBackUrl = dealershipId
+    ? `/app?tg_id=${tgId}&dealership_id=${dealershipId}&section=cars`
+    : `/app?tg_id=${tgId}`;
+  const backUrl = returnUrlFromQuery || fallbackBackUrl;
+
   root.innerHTML = `
-    <a href="/app?tg_id=${tgId}" class="back">← Назад к каталогу</a>
+    <a href="${backUrl}" class="back">← Назад к списку автомобилей</a>
     <article class="card">
       ${renderCardMedia(car)}
       <div class="card-body">
@@ -105,6 +113,7 @@ async function loadCar() {
   if (descriptionNode) {
     descriptionNode.textContent = String(car.description || '');
   }
+
 }
 
 loadCar();

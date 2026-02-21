@@ -73,11 +73,16 @@ function formatPrice(value, currency = 'UZS') {
   return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
 }
 
+function closeCarDetails() {
+  carDetailsSection.classList.add('hidden');
+  carDetailsContent.innerHTML = '';
+}
+
 function openDealershipList() {
   dealershipSection.classList.remove('hidden');
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
-  carDetailsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -91,7 +96,7 @@ function openSubmenu() {
   dealershipSection.classList.add('hidden');
   submenuSection.classList.remove('hidden');
   carsSection.classList.add('hidden');
-  carDetailsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -102,7 +107,7 @@ function openSubmenu() {
 function openCars() {
   submenuSection.classList.add('hidden');
   carsSection.classList.remove('hidden');
-  carDetailsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   if (isAdminUser) adminBox.classList.remove('hidden');
@@ -112,7 +117,7 @@ function openCars() {
 function openSupport() {
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
-  carDetailsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.remove('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
@@ -122,7 +127,7 @@ function openSupport() {
 function openLocation() {
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
-  carDetailsSection.classList.add('hidden');
+  closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.remove('hidden');
   adminBox.classList.add('hidden');
@@ -416,6 +421,7 @@ window.openCar = async (id) => {
   if (!res.ok) return;
 
   const car = await res.json();
+  closeCarDetails();
   carDetailsContent.innerHTML = `
     <article class="card car-details-card">
       ${renderCarMedia(car)}
@@ -440,6 +446,7 @@ window.openCar = async (id) => {
   }
 
   carsSection.classList.add('hidden');
+  adminBox.classList.add('hidden');
   carDetailsSection.classList.remove('hidden');
   initCarousels(carDetailsSection);
   updateSocialBar();
@@ -447,8 +454,11 @@ window.openCar = async (id) => {
 };
 
 function openCarsFromDetails({ fromPopState = false } = {}) {
-  carDetailsSection.classList.add('hidden');
+  closeCarDetails();
   carsSection.classList.remove('hidden');
+  if (isAdminUser) {
+    adminBox.classList.remove('hidden');
+  }
   if (!fromPopState && window.location.hash.startsWith('#car-')) {
     window.history.back();
   }

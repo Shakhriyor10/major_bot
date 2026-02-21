@@ -41,6 +41,7 @@ router = Router()
 
 ADD_CAR_STEPS = [
     ("dealership", "Введите автосалон (ID, slug или название):"),
+    ("position", "Введите позицию в списке (число, где 1 — самый верх):"),
     ("brand", "Введите марку автомобиля (например: BMW):"),
     ("title", "Введите название автомобиля (например: BMW X5 2022):"),
     ("price", "Введите цену (только число, например: 59000):"),
@@ -156,6 +157,7 @@ def init_db() -> None:
             description TEXT NOT NULL,
             image_url TEXT NOT NULL,
             video_url TEXT NOT NULL DEFAULT '',
+            position INTEGER NOT NULL DEFAULT 1000,
             created_at TEXT NOT NULL
         )
         """
@@ -169,6 +171,8 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN currency TEXT NOT NULL DEFAULT 'UZS'")
     if "video_url" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN video_url TEXT NOT NULL DEFAULT ''")
+    if "position" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN position INTEGER NOT NULL DEFAULT 1000")
     dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
     if "instagram_url" not in dealership_columns:
         cur.execute("ALTER TABLE dealerships ADD COLUMN instagram_url TEXT NOT NULL DEFAULT ''")
@@ -312,6 +316,17 @@ def normalize_currency(raw_value: str) -> str | None:
     return None
 
 
+def normalize_position(raw_value: str) -> int | None:
+    value = str(raw_value).strip()
+    if not value or not value.isdigit():
+        return None
+
+    position = int(value)
+    if position < 1:
+        return None
+    return position
+
+
 def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -323,7 +338,7 @@ def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
             FROM cars
             LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
             WHERE cars.dealership_id=?
-            ORDER BY cars.id DESC
+            ORDER BY cars.position ASC, cars.id DESC
             """,
             (dealership_id,),
         )
@@ -333,7 +348,7 @@ def list_cars(dealership_id: int | None = None) -> list[dict[str, Any]]:
             SELECT cars.*, dealerships.name AS dealership_name
             FROM cars
             LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
-            ORDER BY cars.id DESC
+            ORDER BY cars.position ASC, cars.id DESC
             """
         )
     items = [dict(row) for row in cur.fetchall()]
@@ -364,8 +379,8 @@ def add_car(fields: list[str]) -> int:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO cars (dealership_id, brand, title, price, currency, year, mileage, engine, transmission, description, image_url, video_url, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cars (dealership_id, position, brand, title, price, currency, year, mileage, engine, transmission, description, image_url, video_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -381,7 +396,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET dealership_id=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, video_url=?
+        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, video_url=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -477,21 +492,24 @@ def _required_text(payload: dict[str, Any], key: str) -> str:
 
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     dealership_id_raw = _required_text(payload, "dealership_id")
+    position_raw = _required_text(payload, "position")
     currency_raw = _required_text(payload, "currency")
     dealership_id = resolve_dealership_id(dealership_id_raw)
+    position = normalize_position(position_raw)
     currency = normalize_currency(currency_raw)
     brand = _required_text(payload, "brand")
     title = _required_text(payload, "title")
     price = _required_text(payload, "price")
     engine = _required_text(payload, "engine")
     description = _required_text(payload, "description")
-    if not all([brand, title, price, engine, description, dealership_id, currency]):
+    if not all([brand, title, price, engine, description, dealership_id, currency, position]):
         return None
 
     image_url = _required_text(payload, "image_url") or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
     video_url = _required_text(payload, "video_url")
     return [
         str(dealership_id),
+        str(position),
         brand,
         title,
         price,
@@ -647,15 +665,16 @@ async def addcar_cmd(message: Message) -> None:
     payload = (message.text or "").replace("/addcar", "", 1).strip()
     if payload:
         parts = [p.strip() for p in payload.split("|")]
-        if len(parts) != 12:
+        if len(parts) != 13:
             await message.answer(
-                "Формат:\n/addcar dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
+                "Формат:\n/addcar dealership_id | position | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
             )
             return
         parts[0] = str(resolve_dealership_id(parts[0]) or "")
-        parts[4] = normalize_currency(parts[4]) or ""
-        if not parts[0] or not parts[4]:
-            await message.answer("❌ Неверный автосалон или валюта. Используйте ID автосалона и USD/UZS.")
+        parts[1] = str(normalize_position(parts[1]) or "")
+        parts[5] = normalize_currency(parts[5]) or ""
+        if not parts[0] or not parts[1] or not parts[5]:
+            await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
             return
         car_id = add_car(parts)
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
@@ -734,6 +753,14 @@ async def addcar_step_handler(message: Message) -> None:
             return
         draft[key] = normalized
 
+    if key == "position":
+        normalized = normalize_position(draft[key])
+        if not normalized:
+            draft.pop(key, None)
+            await message.answer("❌ Позиция должна быть целым числом больше 0.")
+            return
+        draft[key] = str(normalized)
+
     if key == "image_url" and draft[key] == "-":
         draft[key] = "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
 
@@ -748,6 +775,7 @@ async def addcar_step_handler(message: Message) -> None:
 
     fields = [
         draft["dealership"],
+        draft["position"],
         draft["brand"],
         draft["title"],
         draft["price"],
@@ -771,15 +799,16 @@ async def editcar_cmd(message: Message) -> None:
         return
     payload = message.text.replace("/editcar", "", 1).strip()
     parts = [p.strip() for p in payload.split("|")]
-    if len(parts) != 13 or not parts[0].isdigit():
+    if len(parts) != 14 or not parts[0].isdigit():
         await message.answer(
-            "Формат:\n/editcar id | dealership_id | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
+            "Формат:\n/editcar id | dealership_id | position | brand | title | price | currency(USD/UZS) | year | mileage | engine | transmission | description | image_url | video_url"
         )
         return
     parts[1] = str(resolve_dealership_id(parts[1]) or "")
-    parts[5] = normalize_currency(parts[5]) or ""
-    if not parts[1] or not parts[5]:
-        await message.answer("❌ Неверный автосалон или валюта. Используйте ID автосалона и USD/UZS.")
+    parts[2] = str(normalize_position(parts[2]) or "")
+    parts[6] = normalize_currency(parts[6]) or ""
+    if not parts[1] or not parts[2] or not parts[6]:
+        await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
         return
     ok = edit_car(int(parts[0]), parts[1:])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")

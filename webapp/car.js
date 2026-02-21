@@ -7,6 +7,7 @@ if (tg) {
 const params = new URLSearchParams(window.location.search);
 const carId = Number(params.get('id'));
 const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
+const dealershipId = Number(params.get('dealership_id') || 0);
 
 function formatPrice(value, currency = 'UZS') {
   const raw = String(value ?? '').trim();
@@ -82,8 +83,11 @@ async function loadCar() {
   }
 
   const car = await res.json();
+  const backLink = dealershipId
+    ? `/app?tg_id=${tgId}&dealership_id=${dealershipId}&view=cars`
+    : `/app?tg_id=${tgId}`;
   root.innerHTML = `
-    <a href="/app?tg_id=${tgId}" class="back">← Назад к каталогу</a>
+    <a href="${backLink}" class="back">← Назад к каталогу</a>
     <article class="card">
       ${renderCardMedia(car)}
       <div class="card-body">

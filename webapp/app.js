@@ -21,7 +21,7 @@ const adminBox = document.getElementById('adminBox');
 const adminStatus = document.getElementById('adminStatus');
 const cancelEditBtn = document.getElementById('cancelEdit');
 const adminForm = document.getElementById('adminForm');
-const imageFileInput = document.getElementById('image_file');
+const imageFileInputs = [1, 2, 3, 4, 5].map((index) => document.getElementById(`image_file_${index}`));
 const carSearchInput = document.getElementById('carSearch');
 const brandFilterSelect = document.getElementById('brandFilter');
 const dealershipSelect = document.getElementById('dealership_id');
@@ -232,6 +232,74 @@ function fillLocation() {
   document.getElementById('dealershipTelegramInput').value = currentDealership.telegram_url || '';
 }
 
+
+function getCarImages(car) {
+  return [car.image_url, car.image_url_2, car.image_url_3, car.image_url_4, car.image_url_5]
+    .map((url) => String(url || '').trim())
+    .filter(Boolean);
+}
+
+function renderCardCarousel(car) {
+  const images = getCarImages(car);
+  const firstImage = images[0] || 'https://placehold.co/800x500/1f2937/ffffff?text=Auto';
+  if (images.length <= 1) {
+    return `<img src="${firstImage}" alt="${car.title}" />`;
+  }
+
+  return `
+    <div class="car-carousel" data-carousel>
+      <div class="car-carousel-track" data-carousel-track>
+        ${images.map((url, index) => `<img src="${url}" alt="${car.title} (${index + 1})" class="car-carousel-image" />`).join('')}
+      </div>
+      <div class="car-carousel-dots">
+        ${images.map((_, index) => `<span class="car-carousel-dot${index === 0 ? ' is-active' : ''}"></span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function initCarousels(root = document) {
+  root.querySelectorAll('[data-carousel]').forEach((carousel) => {
+    const track = carousel.querySelector('[data-carousel-track]');
+    const slides = [...track.querySelectorAll('.car-carousel-image')];
+    const dots = [...carousel.querySelectorAll('.car-carousel-dot')];
+    if (slides.length < 2) return;
+
+    let currentIndex = 0;
+    let touchStartX = 0;
+
+    const update = () => {
+      track.style.transform = `translateX(-${currentIndex * 100}%)`;
+      dots.forEach((dot, index) => dot.classList.toggle('is-active', index === currentIndex));
+    };
+
+    const next = () => {
+      currentIndex = (currentIndex + 1) % slides.length;
+      update();
+    };
+
+    let timer = window.setInterval(next, 3000);
+    const resetTimer = () => {
+      window.clearInterval(timer);
+      timer = window.setInterval(next, 3000);
+    };
+
+    carousel.addEventListener('touchstart', (event) => {
+      touchStartX = event.changedTouches[0].clientX;
+    }, { passive: true });
+
+    carousel.addEventListener('touchend', (event) => {
+      const delta = event.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(delta) < 40) return;
+      currentIndex = delta < 0
+        ? (currentIndex + 1) % slides.length
+        : (currentIndex - 1 + slides.length) % slides.length;
+      update();
+      resetTimer();
+    }, { passive: true });
+  });
+}
+
 function renderBrandFilter(cars) {
   const brands = [...new Set(cars.map((car) => (car.brand || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   brandFilterSelect.innerHTML = '<option value="">Все марки</option>' + brands.map((brand) => `<option value="${brand}">${brand}</option>`).join('');
@@ -257,7 +325,7 @@ function renderCars() {
 
   root.innerHTML = filteredCars.map((car) => `
     <article class="card">
-      <img src="${car.image_url}" alt="${car.title}" />
+      ${renderCardCarousel(car)}
       <div class="card-body">
         <h3 class="car-title">${car.title}</h3>
         <p class="price">${formatPrice(car.price, car.currency)}</p>
@@ -267,6 +335,7 @@ function renderCars() {
       </div>
     </article>
   `).join('');
+  initCarousels(root);
 }
 
 async function loadDealerships() {
@@ -285,7 +354,7 @@ async function loadCars() {
     return;
   }
 
-  const res = await fetch(`/api/cars?dealership_id=${currentDealership.id}`);
+  const res = await fetch(`/api/cars?dealership_id=${currentDealership.id}&tg_id=${tgId}`);
   const data = await res.json();
   allCars = data.cars || [];
   renderBrandFilter(allCars);
@@ -297,7 +366,7 @@ window.openCar = (id) => {
 };
 
 window.fillEdit = async (id) => {
-  const res = await fetch(`/api/cars/${id}`);
+  const res = await fetch(`/api/cars/${id}?tg_id=${tgId}`);
   if (!res.ok) return;
   const car = await res.json();
   document.getElementById('carId').value = car.id;
@@ -310,8 +379,13 @@ window.fillEdit = async (id) => {
   document.getElementById('engine').value = car.engine;
   document.getElementById('description').value = car.description;
   document.getElementById('image_url').value = car.image_url || '';
+  document.getElementById('image_url_2').value = car.image_url_2 || '';
+  document.getElementById('image_url_3').value = car.image_url_3 || '';
+  document.getElementById('image_url_4').value = car.image_url_4 || '';
+  document.getElementById('image_url_5').value = car.image_url_5 || '';
+  document.getElementById('is_active').value = String(car.is_active ?? 1);
   document.getElementById('video_url').value = car.video_url || '';
-  imageFileInput.value = '';
+  imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   cancelEditBtn.classList.remove('hidden');
   adminStatus.textContent = `Редактирование #${car.id}`;
 };
@@ -319,17 +393,12 @@ window.fillEdit = async (id) => {
 cancelEditBtn.addEventListener('click', () => {
   adminForm.reset();
   document.getElementById('carId').value = '';
-  imageFileInput.value = '';
+  imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   cancelEditBtn.classList.add('hidden');
   adminStatus.textContent = '';
 });
 
-async function uploadImageIfNeeded() {
-  const file = imageFileInput.files?.[0];
-  if (!file) {
-    return document.getElementById('image_url').value.trim();
-  }
-
+async function uploadSingleImage(file) {
   const formData = new FormData();
   formData.append('tg_id', String(tgId));
   formData.append('image', file);
@@ -342,16 +411,37 @@ async function uploadImageIfNeeded() {
     throw new Error('upload_failed');
   }
   const uploadData = await uploadRes.json();
-  const imageUrl = String(uploadData.image_url || '').trim();
-  document.getElementById('image_url').value = imageUrl;
-  return imageUrl;
+  return String(uploadData.image_url || '').trim();
+}
+
+async function uploadImagesIfNeeded() {
+  const urlInputs = [
+    document.getElementById('image_url'),
+    document.getElementById('image_url_2'),
+    document.getElementById('image_url_3'),
+    document.getElementById('image_url_4'),
+    document.getElementById('image_url_5'),
+  ];
+
+  const imageUrls = [];
+  for (let index = 0; index < 5; index += 1) {
+    const file = imageFileInputs[index]?.files?.[0];
+    if (file) {
+      const uploadedUrl = await uploadSingleImage(file);
+      urlInputs[index].value = uploadedUrl;
+      imageUrls.push(uploadedUrl);
+    } else {
+      imageUrls.push(urlInputs[index].value.trim());
+    }
+  }
+  return imageUrls;
 }
 
 adminForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
     const carId = document.getElementById('carId').value;
-    const imageUrl = await uploadImageIfNeeded();
+    const imageUrls = await uploadImagesIfNeeded();
     const payload = {
       tg_id: tgId,
       dealership_id: Number(dealershipSelect.value),
@@ -362,7 +452,12 @@ adminForm.addEventListener('submit', async (e) => {
       currency: document.getElementById('currency').value,
       engine: document.getElementById('engine').value.trim(),
       description: document.getElementById('description').value.trim(),
-      image_url: imageUrl,
+      image_url: imageUrls[0],
+      image_url_2: imageUrls[1],
+      image_url_3: imageUrls[2],
+      image_url_4: imageUrls[3],
+      image_url_5: imageUrls[4],
+      is_active: Number(document.getElementById('is_active').value),
       video_url: document.getElementById('video_url').value.trim(),
     };
 
@@ -378,7 +473,7 @@ adminForm.addEventListener('submit', async (e) => {
       adminStatus.textContent = carId ? '✅ Машина обновлена' : '✅ Машина добавлена';
       adminForm.reset();
       document.getElementById('carId').value = '';
-      imageFileInput.value = '';
+      imageFileInputs.forEach((input) => { if (input) input.value = ''; });
       cancelEditBtn.classList.add('hidden');
       await loadCars();
     } else {

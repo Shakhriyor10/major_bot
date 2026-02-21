@@ -257,10 +257,6 @@ async def send_welcome_message(message: Message) -> None:
         "Выбирайте с комфортом.",
         reply_markup=inline_kb,
     )
-    await message.answer(
-        "⬇️ Также можете открыть приложение кнопкой внизу.",
-        reply_markup=build_main_keyboard(message.from_user.id),
-    )
 
 
 def count_users() -> int:

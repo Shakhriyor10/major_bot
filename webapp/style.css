@@ -248,6 +248,10 @@ body.app-ready .container {
   color: var(--tg-text);
   border: 1px solid var(--line);
 }
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
 .support-box {
   margin-top: 18px;
   background: var(--card);

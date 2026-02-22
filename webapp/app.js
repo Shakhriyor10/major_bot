@@ -22,6 +22,7 @@ const locationSection = document.getElementById('locationSection');
 const adminBox = document.getElementById('adminBox');
 const adminStatus = document.getElementById('adminStatus');
 const cancelEditBtn = document.getElementById('cancelEdit');
+const deleteCarBtn = document.getElementById('deleteCar');
 const adminForm = document.getElementById('adminForm');
 const imageFileInputs = [1, 2, 3, 4, 5].map((index) => document.getElementById(`image_file_${index}`));
 const carSearchInput = document.getElementById('carSearch');
@@ -486,6 +487,7 @@ window.fillEdit = async (id) => {
   document.getElementById('video_url').value = car.video_url || '';
   imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   cancelEditBtn.classList.remove('hidden');
+  deleteCarBtn.classList.remove('hidden');
   adminStatus.textContent = `Редактирование #${car.id}`;
 };
 
@@ -494,6 +496,7 @@ cancelEditBtn.addEventListener('click', () => {
   document.getElementById('carId').value = '';
   imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   cancelEditBtn.classList.add('hidden');
+  deleteCarBtn.classList.add('hidden');
   adminStatus.textContent = '';
 });
 
@@ -536,6 +539,39 @@ async function uploadImagesIfNeeded() {
   return imageUrls;
 }
 
+
+
+deleteCarBtn.addEventListener('click', async () => {
+  const carId = document.getElementById('carId').value;
+  if (!carId) {
+    adminStatus.textContent = 'Сначала выберите машину для удаления (нажмите «Редактировать»).';
+    return;
+  }
+
+  const isConfirmed = window.confirm('Вы точно хотите удалить эту машину? После подтверждения запись будет удалена из базы данных без возможности восстановления.');
+  if (!isConfirmed) {
+    return;
+  }
+
+  const res = await fetch(`/api/cars/${carId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tg_id: tgId }),
+  });
+
+  if (res.ok) {
+    adminStatus.textContent = '✅ Машина удалена';
+    adminForm.reset();
+    document.getElementById('carId').value = '';
+    imageFileInputs.forEach((input) => { if (input) input.value = ''; });
+    cancelEditBtn.classList.add('hidden');
+    deleteCarBtn.classList.add('hidden');
+    await loadCars();
+  } else {
+    adminStatus.textContent = '❌ Не удалось удалить машину';
+  }
+});
+
 adminForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -574,6 +610,7 @@ adminForm.addEventListener('submit', async (e) => {
       document.getElementById('carId').value = '';
       imageFileInputs.forEach((input) => { if (input) input.value = ''; });
       cancelEditBtn.classList.add('hidden');
+      deleteCarBtn.classList.add('hidden');
       await loadCars();
     } else {
       adminStatus.textContent = '❌ Ошибка сохранения. Проверьте права и заполнение полей.';

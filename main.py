@@ -1174,10 +1174,17 @@ async def api_car(request: web.Request) -> web.Response:
 
 
 async def api_manage_car(request: web.Request) -> web.Response:
-    data = await request.json()
-    tg_id = int(data.get("tg_id", 0))
+    data = await request.json() if request.can_read_body else {}
+    tg_id = int(data.get("tg_id", request.query.get("tg_id", 0)))
     if not is_admin(tg_id):
         return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+
+    if request.method == "DELETE":
+        car_id = int(request.match_info["car_id"])
+        ok = delete_car(car_id)
+        if not ok:
+            return web.json_response({"ok": False, "error": "not_found"}, status=404)
+        return web.json_response({"ok": True, "id": car_id})
 
     fields = build_car_fields(data)
     if fields is None:
@@ -1257,6 +1264,7 @@ async def run_web(bot: Bot) -> None:
     app.router.add_get("/api/cars/{car_id}", api_car)
     app.router.add_post("/api/cars", api_manage_car)
     app.router.add_put("/api/cars/{car_id}", api_manage_car)
+    app.router.add_delete("/api/cars/{car_id}", api_manage_car)
     app.router.add_post("/api/upload-image", api_upload_image)
     app.router.add_put("/api/dealerships/{dealership_id}", api_manage_dealership)
     app.router.add_get("/api/is-admin", api_admin_check)

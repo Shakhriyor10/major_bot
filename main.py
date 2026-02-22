@@ -103,10 +103,15 @@ def init_db() -> None:
             full_name TEXT NOT NULL,
             username TEXT,
             phone TEXT,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            last_active_at TEXT NOT NULL
         )
         """
     )
+    user_columns = {row[1] for row in cur.execute("PRAGMA table_info(users)")}
+    if "last_active_at" not in user_columns:
+        cur.execute("ALTER TABLE users ADD COLUMN last_active_at TEXT NOT NULL DEFAULT ''")
+
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS dealerships (
@@ -214,12 +219,13 @@ def save_user(message: Message, phone: str) -> None:
     full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
     cur.execute(
         """
-        INSERT INTO users (tg_id, full_name, username, phone, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (tg_id, full_name, username, phone, created_at, last_active_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(tg_id) DO UPDATE SET
             full_name=excluded.full_name,
             username=excluded.username,
-            phone=excluded.phone
+            phone=excluded.phone,
+            last_active_at=excluded.last_active_at
         """,
         (
             message.from_user.id,
@@ -227,6 +233,33 @@ def save_user(message: Message, phone: str) -> None:
             message.from_user.username,
             phone,
             datetime.utcnow().isoformat(),
+            datetime.utcnow().isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def touch_user_activity(message: Message) -> None:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+    now = datetime.utcnow().isoformat()
+    cur.execute(
+        """
+        INSERT INTO users (tg_id, full_name, username, phone, created_at, last_active_at)
+        VALUES (?, ?, ?, NULL, ?, ?)
+        ON CONFLICT(tg_id) DO UPDATE SET
+            full_name=excluded.full_name,
+            username=excluded.username,
+            last_active_at=excluded.last_active_at
+        """,
+        (
+            message.from_user.id,
+            full_name,
+            message.from_user.username,
+            now,
+            now,
         ),
     )
     conn.commit()
@@ -285,6 +318,59 @@ def count_users() -> int:
     total = int(cur.fetchone()[0])
     conn.close()
     return total
+
+
+def list_recent_active_users(limit: int = 10) -> list[dict[str, str]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT full_name, username, phone
+        FROM users
+        WHERE phone IS NOT NULL AND trim(phone) != ''
+        ORDER BY datetime(last_active_at) DESC, id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    users = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return users
+
+
+def list_new_users(limit: int = 10) -> list[dict[str, str]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT full_name, username, phone
+        FROM users
+        WHERE phone IS NOT NULL AND trim(phone) != ''
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    users = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return users
+
+
+def format_user_stats_line(index: int, user: dict[str, str]) -> str:
+    full_name = (user.get("full_name") or "").strip()
+    username = (user.get("username") or "").strip()
+    phone = (user.get("phone") or "—").strip() or "—"
+    if full_name and username:
+        display = f"{full_name} (@{username})"
+    elif full_name:
+        display = full_name
+    elif username:
+        display = f"@{username}"
+    else:
+        display = "Без имени"
+    return f"{index}. {display} — {phone}"
 
 
 def list_user_ids() -> list[int]:
@@ -580,6 +666,7 @@ def save_uploaded_image(raw_data: bytes, original_name: str = "") -> str:
 
 @router.message(Command("start"))
 async def start_cmd(message: Message) -> None:
+    touch_user_activity(message)
     if get_user_phone(message.from_user.id):
         await send_welcome_message(message)
         return
@@ -605,7 +692,23 @@ async def admin_stats_handler(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return
     total_users = count_users()
-    await message.answer(f"👥 Всего пользователей: {total_users}")
+    active_users = list_recent_active_users(10)
+    new_users = list_new_users(10)
+
+    active_lines = [
+        format_user_stats_line(index, user)
+        for index, user in enumerate(active_users, start=1)
+    ]
+    new_lines = [
+        format_user_stats_line(index, user)
+        for index, user in enumerate(new_users, start=1)
+    ]
+
+    text = [f"👥 Всего пользователей: {total_users}", "", "🔥 10 активных пользователей:"]
+    text.extend(active_lines or ["Нет данных"])
+    text.extend(["", "🆕 10 последних нажавших /start:"])
+    text.extend(new_lines or ["Нет данных"])
+    await message.answer("\n".join(text))
 
 
 @router.message(F.chat.type == "private", F.text == ADMIN_BROADCAST_BUTTON_TEXT)

@@ -511,3 +511,6 @@ textarea { min-height: 90px; }
   background: #fff;
   padding: 4px;
 }
+.car-details-card {
+  margin-bottom: 14px;
+}

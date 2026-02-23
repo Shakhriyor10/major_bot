@@ -272,14 +272,23 @@ body.app-ready .container {
 
 .price-discount {
   margin: 0;
-  color: #dc2626;
+  color: #16a34a;
   font-weight: 800;
 }
 
+.price-discount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .discount-timer {
-  margin-top: 4px;
+  margin: 0;
   font-size: 13px;
   color: var(--tg-hint);
+  text-align: right;
+  white-space: nowrap;
 }
 
 .hot-badge {

@@ -59,8 +59,10 @@ function renderPriceBlock(car) {
   return `
     <div class="price-block">
       <p class="price-original">${formatPrice(car.price, car.currency)}</p>
-      <p class="price-discount">Цена со скидкой: ${formatPrice(discount.discountPrice, car.currency)}</p>
-      ${timerHtml}
+      <div class="price-discount-row">
+        <p class="price-discount">${formatPrice(discount.discountPrice, car.currency)}</p>
+        ${timerHtml}
+      </div>
     </div>
   `;
 }
@@ -228,7 +230,6 @@ async function loadCar() {
       ${renderCardMedia(car)}
       <div class="card-body">
         <h1 class="car-title">${car.title}</h1>
-        ${car.is_hot ? "<span class=\"hot-badge\">🔥 Горячий продукт</span>" : ""}
         ${renderPriceBlock(car)}
         <ul class="feature-list">
           <li><b>Марка:</b> ${car.brand || 'Без марки'}</li>

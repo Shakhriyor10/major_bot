@@ -124,6 +124,12 @@
         <input id="brand" placeholder="Марка автомобиля" required />
         <input id="title" placeholder="Название" required />
         <input id="price" placeholder="Цена (число)" required />
+        <input id="discount_price" placeholder="Цена со скидкой (необязательно)" />
+        <input id="discount_until" type="datetime-local" placeholder="Скидка действует до (необязательно)" />
+        <label class="checkbox-row" for="is_hot">
+          <input id="is_hot" type="checkbox" />
+          <span>Горячий продукт (поднимать наверх)</span>
+        </label>
         <select id="currency" required>
           <option value="UZS">Сум (UZS)</option>
           <option value="USD">Доллар (USD)</option>

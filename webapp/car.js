@@ -16,6 +16,79 @@ function formatPrice(value, currency = 'UZS') {
   return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
 }
 
+
+function getDiscountState(car) {
+  const discountPrice = String(car.discount_price || '').trim();
+  if (!discountPrice) return null;
+
+  const untilRaw = String(car.discount_until || '').trim();
+  if (!untilRaw) {
+    return { discountPrice, untilDate: null };
+  }
+
+  const untilDate = new Date(untilRaw);
+  if (Number.isNaN(untilDate.getTime()) || untilDate.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return { discountPrice, untilDate };
+}
+
+function formatCountdown(untilDate) {
+  const diffMs = untilDate.getTime() - Date.now();
+  if (diffMs <= 0) return 'Скидка завершена';
+
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days}д ${hours}ч ${minutes}м ${seconds}с`;
+}
+
+function renderPriceBlock(car) {
+  const discount = getDiscountState(car);
+  if (!discount) {
+    return `<p class="price">${formatPrice(car.price, car.currency)}</p>`;
+  }
+
+  const timerHtml = discount.untilDate
+    ? `<p class="discount-timer" data-discount-timer data-deadline="${discount.untilDate.toISOString()}">${formatCountdown(discount.untilDate)}</p>`
+    : '';
+
+  return `
+    <div class="price-block">
+      <p class="price-original">${formatPrice(car.price, car.currency)}</p>
+      <div class="price-discount-row">
+        <p class="price-discount">${formatPrice(discount.discountPrice, car.currency)}</p>
+        ${timerHtml}
+      </div>
+    </div>
+  `;
+}
+
+let countdownTimerId = null;
+function setupDiscountCountdowns() {
+  if (countdownTimerId) {
+    window.clearInterval(countdownTimerId);
+  }
+
+  const timers = [...document.querySelectorAll('[data-discount-timer]')];
+  if (!timers.length) return;
+
+  const tick = () => {
+    timers.forEach((node) => {
+      const deadline = node.dataset.deadline;
+      const untilDate = deadline ? new Date(deadline) : null;
+      if (!untilDate || Number.isNaN(untilDate.getTime())) return;
+      node.textContent = formatCountdown(untilDate);
+    });
+  };
+
+  tick();
+  countdownTimerId = window.setInterval(tick, 1000);
+}
+
 function getYoutubeEmbedUrl(rawUrl) {
   const value = String(rawUrl || '').trim();
   if (!value) return '';
@@ -157,7 +230,7 @@ async function loadCar() {
       ${renderCardMedia(car)}
       <div class="card-body">
         <h1 class="car-title">${car.title}</h1>
-        <p class="price">${formatPrice(car.price, car.currency)}</p>
+        ${renderPriceBlock(car)}
         <ul class="feature-list">
           <li><b>Марка:</b> ${car.brand || 'Без марки'}</li>
           <li><b>Двигатель:</b> ${car.engine}</li>
@@ -176,6 +249,7 @@ async function loadCar() {
   }
 
   initCarousel(root);
+  setupDiscountCountdowns();
 }
 
 loadCar();

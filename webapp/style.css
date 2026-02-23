@@ -243,6 +243,10 @@ body.app-ready .container {
   font-weight: 700;
   cursor: pointer;
 }
+
+.btn-full {
+  width: 100%;
+}
 .btn-secondary {
   background: transparent;
   color: var(--tg-text);

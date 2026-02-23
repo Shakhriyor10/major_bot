@@ -386,7 +386,7 @@ function renderCars() {
         <h3 class="car-title">${car.title}</h3>
         <p class="price">${formatPrice(car.price, car.currency)}</p>
         <div class="specs">Двигатель: ${car.engine}</div>
-        <button class="btn" onclick="openCar(${car.id})">Подробнее</button>
+        <button class="btn ${isAdminUser ? '' : 'btn-full'}" onclick="openCar(${car.id})">Открыть</button>
         ${isAdminUser ? `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>` : ''}
       </div>
     </article>

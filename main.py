@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -166,6 +166,9 @@ def init_db() -> None:
             image_url_4 TEXT NOT NULL DEFAULT '',
             image_url_5 TEXT NOT NULL DEFAULT '',
             video_url TEXT NOT NULL DEFAULT '',
+            discount_price TEXT NOT NULL DEFAULT '',
+            discount_until TEXT NOT NULL DEFAULT '',
+            is_hot INTEGER NOT NULL DEFAULT 0,
             is_active INTEGER NOT NULL DEFAULT 1,
             position INTEGER NOT NULL DEFAULT 1000,
             created_at TEXT NOT NULL
@@ -191,6 +194,12 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN image_url_5 TEXT NOT NULL DEFAULT ''")
     if "is_active" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
+    if "discount_price" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN discount_price TEXT NOT NULL DEFAULT ''")
+    if "discount_until" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN discount_until TEXT NOT NULL DEFAULT ''")
+    if "is_hot" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN is_hot INTEGER NOT NULL DEFAULT 0")
     if "position" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN position INTEGER NOT NULL DEFAULT 1000")
     dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
@@ -428,10 +437,41 @@ def normalize_position(raw_value: str) -> int | None:
     return position
 
 
+def parse_discount_until(raw_value: str) -> str:
+    value = str(raw_value).strip()
+    if not value:
+        return ""
+
+    normalized = value.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return ""
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def cleanup_expired_discounts(conn: sqlite3.Connection) -> None:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """
+        UPDATE cars
+        SET discount_price='', discount_until=''
+        WHERE trim(discount_price) != ''
+          AND trim(discount_until) != ''
+          AND discount_until <= ?
+        """,
+        (now_iso,),
+    )
+
+
 def list_cars(dealership_id: int | None = None, include_inactive: bool = True) -> list[dict[str, Any]]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+    cleanup_expired_discounts(conn)
     where_parts: list[str] = []
     params: list[Any] = []
     if dealership_id:
@@ -448,7 +488,7 @@ def list_cars(dealership_id: int | None = None, include_inactive: bool = True) -
         FROM cars
         LEFT JOIN dealerships ON dealerships.id = cars.dealership_id
         {where_sql}
-        ORDER BY cars.position ASC, cars.id DESC
+        ORDER BY cars.is_hot DESC, cars.position ASC, cars.id DESC
         """,
         params,
     )
@@ -461,6 +501,7 @@ def get_car(car_id: int, include_inactive: bool = True) -> dict[str, Any] | None
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+    cleanup_expired_discounts(conn)
     visibility_filter = "" if include_inactive else " AND cars.is_active=1"
     cur.execute(
         f"""
@@ -484,9 +525,9 @@ def add_car(fields: list[str]) -> int:
         INSERT INTO cars (
             dealership_id, position, brand, title, price, currency, year, mileage,
             engine, transmission, description, image_url, image_url_2, image_url_3,
-            image_url_4, image_url_5, video_url, is_active, created_at
+            image_url_4, image_url_5, video_url, discount_price, discount_until, is_hot, is_active, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -502,7 +543,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, is_active=?
+        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, discount_price=?, discount_until=?, is_hot=?, is_active=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -605,6 +646,13 @@ def parse_active_flag(raw_value: Any) -> int:
     return 1
 
 
+def parse_hot_flag(raw_value: Any) -> int:
+    value = str(raw_value).strip().lower()
+    if value in {"1", "true", "yes", "on", "hot", "горячий"}:
+        return 1
+    return 0
+
+
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     dealership_id_raw = _required_text(payload, "dealership_id")
     position_raw = _required_text(payload, "position")
@@ -630,6 +678,14 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     image_urls[0] = image_urls[0] or "https://placehold.co/800x500/1f2937/ffffff?text=Auto"
 
     video_url = _required_text(payload, "video_url")
+    discount_price = _required_text(payload, "discount_price")
+    discount_until = parse_discount_until(_required_text(payload, "discount_until"))
+    if not discount_price:
+        discount_until = ""
+    if discount_price and discount_until and discount_until <= datetime.now(timezone.utc).isoformat():
+        discount_price = ""
+        discount_until = ""
+    is_hot = parse_hot_flag(payload.get("is_hot", 0))
     is_active = parse_active_flag(payload.get("is_active", 1))
     return [
         str(dealership_id),
@@ -649,6 +705,9 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         image_urls[3],
         image_urls[4],
         video_url,
+        discount_price,
+        discount_until,
+        str(is_hot),
         str(is_active),
     ]
 
@@ -822,7 +881,7 @@ async def addcar_cmd(message: Message) -> None:
         if not parts[0] or not parts[1] or not parts[5]:
             await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
             return
-        car_id = add_car(parts + ["", "", "", "", "1"])
+        car_id = add_car(parts + ["", "", "", "", "", "", "0", "1"])
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
         return
 
@@ -961,7 +1020,7 @@ async def editcar_cmd(message: Message) -> None:
     if not parts[1] or not parts[2] or not parts[6]:
         await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
         return
-    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "1"])
+    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "", "", "0", "1"])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")
 
 

@@ -74,6 +74,98 @@ function formatPrice(value, currency = 'UZS') {
   return currency === 'USD' ? `${grouped} $` : `${grouped} сум`;
 }
 
+
+function getDiscountState(car) {
+  const discountPrice = String(car.discount_price || '').trim();
+  if (!discountPrice) return null;
+
+  const untilRaw = String(car.discount_until || '').trim();
+  if (!untilRaw) {
+    return { discountPrice, untilDate: null };
+  }
+
+  const untilDate = new Date(untilRaw);
+  if (Number.isNaN(untilDate.getTime()) || untilDate.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return { discountPrice, untilDate };
+}
+
+function formatCountdown(untilDate) {
+  const diffMs = untilDate.getTime() - Date.now();
+  if (diffMs <= 0) return 'Скидка завершена';
+
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `До конца скидки: ${days}д ${hours}ч ${minutes}м ${seconds}с`;
+}
+
+function renderPriceBlock(car) {
+  const discount = getDiscountState(car);
+  if (!discount) {
+    return `<p class="price">${formatPrice(car.price, car.currency)}</p>`;
+  }
+
+  const timerHtml = discount.untilDate
+    ? `<p class="discount-timer" data-discount-timer data-deadline="${discount.untilDate.toISOString()}">${formatCountdown(discount.untilDate)}</p>`
+    : '';
+
+  return `
+    <div class="price-block">
+      <p class="price-original">${formatPrice(car.price, car.currency)}</p>
+      <p class="price-discount">Цена со скидкой: ${formatPrice(discount.discountPrice, car.currency)}</p>
+      ${timerHtml}
+    </div>
+  `;
+}
+
+let countdownTimerId = null;
+function setupDiscountCountdowns() {
+  if (countdownTimerId) {
+    window.clearInterval(countdownTimerId);
+    countdownTimerId = null;
+  }
+
+  const timers = [...document.querySelectorAll('[data-discount-timer]')];
+  if (!timers.length) return;
+
+  const tick = () => {
+    let hasExpired = false;
+    timers.forEach((node) => {
+      const deadline = node.dataset.deadline;
+      const untilDate = deadline ? new Date(deadline) : null;
+      if (!untilDate || Number.isNaN(untilDate.getTime())) {
+        node.textContent = '';
+        return;
+      }
+      const remaining = untilDate.getTime() - Date.now();
+      if (remaining <= 0) {
+        hasExpired = true;
+      }
+      node.textContent = formatCountdown(untilDate);
+    });
+
+    if (hasExpired) {
+      window.clearInterval(countdownTimerId);
+      countdownTimerId = null;
+      loadCars();
+      if (!carDetailsSection.classList.contains('hidden')) {
+        const activeId = Number((window.location.hash || '').replace('#car-', ''));
+        if (activeId) {
+          window.openCar(activeId);
+        }
+      }
+    }
+  };
+
+  tick();
+  countdownTimerId = window.setInterval(tick, 1000);
+}
+
 function closeCarDetails() {
   carDetailsSection.classList.add('hidden');
   carDetailsContent.innerHTML = '';
@@ -384,7 +476,8 @@ function renderCars() {
       ${renderCardCarousel(car)}
       <div class="card-body">
         <h3 class="car-title">${car.title}</h3>
-        <p class="price">${formatPrice(car.price, car.currency)}</p>
+        ${car.is_hot ? "<span class=\"hot-badge\">🔥 Горячий продукт</span>" : ""}
+        ${renderPriceBlock(car)}
         <div class="specs">Двигатель: ${car.engine}</div>
         <button class="btn ${isAdminUser ? '' : 'btn-full'}" onclick="openCar(${car.id})">Открыть</button>
         ${isAdminUser ? `<button class="btn btn-secondary" onclick="fillEdit(${car.id})">Редактировать</button>` : ''}
@@ -392,6 +485,7 @@ function renderCars() {
     </article>
   `).join('');
   initCarousels(root);
+  setupDiscountCountdowns();
 }
 
 async function loadDealerships() {
@@ -428,7 +522,8 @@ window.openCar = async (id) => {
       ${renderCarMedia(car)}
       <div class="card-body">
         <h1 class="car-title">${car.title}</h1>
-        <p class="price">${formatPrice(car.price, car.currency)}</p>
+        ${car.is_hot ? "<span class=\"hot-badge\">🔥 Горячий продукт</span>" : ""}
+        ${renderPriceBlock(car)}
         <ul class="feature-list">
           <li><b>Марка:</b> ${car.brand || 'Без марки'}</li>
           <li><b>Двигатель:</b> ${car.engine}</li>
@@ -450,6 +545,7 @@ window.openCar = async (id) => {
   adminBox.classList.add('hidden');
   carDetailsSection.classList.remove('hidden');
   initCarousels(carDetailsSection);
+  setupDiscountCountdowns();
   updateSocialBar();
   window.history.pushState({ screen: 'carDetails', carId: id }, '', `#car-${id}`);
 };
@@ -475,6 +571,9 @@ window.fillEdit = async (id) => {
   document.getElementById('brand').value = car.brand || '';
   document.getElementById('title').value = car.title;
   document.getElementById('price').value = car.price;
+  document.getElementById('discount_price').value = car.discount_price || '';
+  document.getElementById('discount_until').value = car.discount_until ? String(car.discount_until).slice(0, 16) : '';
+  document.getElementById('is_hot').checked = Number(car.is_hot || 0) === 1;
   document.getElementById('currency').value = car.currency || 'UZS';
   document.getElementById('engine').value = car.engine;
   document.getElementById('description').value = car.description;
@@ -495,6 +594,7 @@ cancelEditBtn.addEventListener('click', () => {
   adminForm.reset();
   document.getElementById('carId').value = '';
   imageFileInputs.forEach((input) => { if (input) input.value = ''; });
+  document.getElementById('is_hot').checked = false;
   cancelEditBtn.classList.add('hidden');
   deleteCarBtn.classList.add('hidden');
   adminStatus.textContent = '';
@@ -584,6 +684,9 @@ adminForm.addEventListener('submit', async (e) => {
       brand: document.getElementById('brand').value.trim(),
       title: document.getElementById('title').value.trim(),
       price: document.getElementById('price').value.trim(),
+      discount_price: document.getElementById('discount_price').value.trim(),
+      discount_until: document.getElementById('discount_until').value,
+      is_hot: document.getElementById('is_hot').checked ? 1 : 0,
       currency: document.getElementById('currency').value,
       engine: document.getElementById('engine').value.trim(),
       description: document.getElementById('description').value.trim(),

@@ -244,6 +244,65 @@ body.app-ready .container {
   cursor: pointer;
 }
 
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  color: var(--tg-text);
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.price-block {
+  margin: 0 0 10px;
+}
+
+.price-original {
+  margin: 0;
+  color: var(--tg-hint);
+  text-decoration: line-through;
+  font-size: 14px;
+}
+
+.price-discount {
+  margin: 0;
+  color: #16a34a;
+  font-weight: 800;
+}
+
+.price-discount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.discount-timer {
+  margin: 0;
+  font-size: 13px;
+  color: var(--tg-hint);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hot-badge {
+  display: inline-block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
 .btn-full {
   width: 100%;
 }

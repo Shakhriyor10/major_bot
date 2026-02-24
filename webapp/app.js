@@ -221,9 +221,14 @@ function openSupport() {
 
 async function ensureRegisteredForSupport() {
   const status = document.getElementById('status');
-  const registrationMessage = 'Вы не зарегистрированы в боте, пожалуйста зарегистрируйтесь: https://t.me/MajorSamarkandBOT';
+  const supportInput = document.getElementById('supportText');
+  const supportSendButton = document.getElementById('sendSupport');
+  const registrationLink = 'https://t.me/MajorSamarkandBOT';
   const res = await fetch(`/api/is-registered?tg_id=${tgId}`);
+
   if (!res.ok) {
+    supportInput.classList.add('hidden');
+    supportSendButton.classList.add('hidden');
     status.textContent = '❌ Не удалось проверить регистрацию. Попробуйте позже.';
     return false;
   }
@@ -231,16 +236,15 @@ async function ensureRegisteredForSupport() {
   const data = await res.json();
   if (!data.is_registered) {
     openSupport();
-    status.textContent = registrationMessage;
-    document.getElementById('supportText').disabled = true;
-    document.getElementById('sendSupport').disabled = true;
+    supportInput.classList.add('hidden');
+    supportSendButton.classList.add('hidden');
+    status.innerHTML = `Вы не зарегистрированы в боте, пожалуйста зарегистрируйтесь: <a href="${registrationLink}" target="_blank" rel="noopener noreferrer">${registrationLink}</a>`;
     return false;
   }
 
-  document.getElementById('supportText').disabled = false;
-  document.getElementById('sendSupport').disabled = false;
+  supportInput.classList.remove('hidden');
+  supportSendButton.classList.remove('hidden');
   status.textContent = '';
-
   return true;
 }
 

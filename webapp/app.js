@@ -320,8 +320,7 @@ function applySocialLink(anchor, url) {
 
 function updateSocialBar() {
   const isDealershipSelectionVisible = !dealershipSection.classList.contains('hidden');
-  const isCarDetailsVisible = !carDetailsSection.classList.contains('hidden');
-  if (!currentDealership || isDealershipSelectionVisible || isCarDetailsVisible) {
+  if (!currentDealership || isDealershipSelectionVisible) {
     socialBar.classList.add('hidden');
     return;
   }

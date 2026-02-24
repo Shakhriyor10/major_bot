@@ -374,6 +374,8 @@ function renderPromoCars() {
           </article>
         `).join('')}
       </div>
+      <button class="promo-nav promo-nav-prev" type="button" aria-label="Предыдущий слайд" data-carousel-prev>‹</button>
+      <button class="promo-nav promo-nav-next" type="button" aria-label="Следующий слайд" data-carousel-next>›</button>
       <div class="promo-dots car-carousel-dots">
         ${promoCars.map((_, index) => `<span class="car-carousel-dot${index === 0 ? ' is-active' : ''}"></span>`).join('')}
       </div>
@@ -494,8 +496,12 @@ function renderCarMedia(car) {
 function initCarousels(root = document) {
   root.querySelectorAll('[data-carousel]').forEach((carousel) => {
     const track = carousel.querySelector('[data-carousel-track]');
-    const slides = [...track.querySelectorAll('.car-carousel-image')];
+    if (!track) return;
+
+    const slides = [...track.children];
     const dots = [...carousel.querySelectorAll('.car-carousel-dot')];
+    const prevBtn = carousel.querySelector('[data-carousel-prev]');
+    const nextBtn = carousel.querySelector('[data-carousel-next]');
     if (slides.length < 2) return;
 
     let currentIndex = 0;
@@ -506,16 +512,31 @@ function initCarousels(root = document) {
       dots.forEach((dot, index) => dot.classList.toggle('is-active', index === currentIndex));
     };
 
-    const next = () => {
+    const goNext = () => {
       currentIndex = (currentIndex + 1) % slides.length;
       update();
     };
 
-    let timer = window.setInterval(next, 3000);
+    const goPrev = () => {
+      currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+      update();
+    };
+
+    let timer = window.setInterval(goNext, 3000);
     const resetTimer = () => {
       window.clearInterval(timer);
-      timer = window.setInterval(next, 3000);
+      timer = window.setInterval(goNext, 3000);
     };
+
+    prevBtn?.addEventListener('click', () => {
+      goPrev();
+      resetTimer();
+    });
+
+    nextBtn?.addEventListener('click', () => {
+      goNext();
+      resetTimer();
+    });
 
     carousel.addEventListener('touchstart', (event) => {
       touchStartX = event.changedTouches[0].clientX;
@@ -524,10 +545,8 @@ function initCarousels(root = document) {
     carousel.addEventListener('touchend', (event) => {
       const delta = event.changedTouches[0].clientX - touchStartX;
       if (Math.abs(delta) < 40) return;
-      currentIndex = delta < 0
-        ? (currentIndex + 1) % slides.length
-        : (currentIndex - 1 + slides.length) % slides.length;
-      update();
+      if (delta < 0) goNext();
+      else goPrev();
       resetTimer();
     }, { passive: true });
   });

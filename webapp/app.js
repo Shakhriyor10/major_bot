@@ -10,6 +10,7 @@ if (tg) {
 const params = new URLSearchParams(window.location.search);
 const tgId = Number(params.get('tg_id') || tg?.initDataUnsafe?.user?.id || 0);
 
+const promoSection = document.getElementById('promoSection');
 const dealershipSection = document.getElementById('dealershipSection');
 const submenuSection = document.getElementById('submenuSection');
 const pageTitleText = document.getElementById('pageTitleText');
@@ -39,6 +40,8 @@ let isAdminUser = false;
 let allCars = [];
 let dealerships = [];
 let currentDealership = null;
+let promoCars = [];
+let currentCarSource = 'catalog';
 
 function playStartupSplash() {
   const splash = document.getElementById('startupSplash');
@@ -176,12 +179,14 @@ function closeCarDetails() {
 function openDealershipList() {
   dealershipSection.classList.remove('hidden');
   submenuSection.classList.add('hidden');
+  promoSection.classList.remove('hidden');
   carsSection.classList.add('hidden');
   closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   currentDealership = null;
+  currentCarSource = 'catalog';
   updateHeaderTitle();
   fillDealershipDescription();
   updateSocialBar();
@@ -190,6 +195,7 @@ function openDealershipList() {
 function openSubmenu() {
   dealershipSection.classList.add('hidden');
   submenuSection.classList.remove('hidden');
+  promoSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   closeCarDetails();
   supportSection.classList.add('hidden');
@@ -202,6 +208,7 @@ function openSubmenu() {
 function openCars() {
   submenuSection.classList.add('hidden');
   carsSection.classList.remove('hidden');
+  promoSection.classList.add('hidden');
   closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.add('hidden');
@@ -214,6 +221,7 @@ function openSupport() {
   carsSection.classList.add('hidden');
   closeCarDetails();
   supportSection.classList.remove('hidden');
+  promoSection.classList.add('hidden');
   locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   updateSocialBar();
@@ -254,6 +262,7 @@ function openLocation() {
   closeCarDetails();
   supportSection.classList.add('hidden');
   locationSection.classList.remove('hidden');
+  promoSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   updateSocialBar();
 }
@@ -337,6 +346,51 @@ function fillDealershipDescription() {
 
   dealershipDescriptionText.textContent = description;
   dealershipDescriptionBox.classList.remove('hidden');
+}
+
+
+function renderPromoCars() {
+  if (!promoCars.length) {
+    promoSection.classList.add('hidden');
+    promoSection.innerHTML = '';
+    return;
+  }
+
+  promoSection.classList.remove('hidden');
+  promoSection.innerHTML = `
+    <div class="promo-carousel" data-carousel>
+      <div class="promo-carousel-track" data-carousel-track>
+        ${promoCars.map((car) => `
+          <article class="promo-slide">
+            <button class="promo-media-btn" onclick="openCar(${car.id}, 'promo')">
+              <img src="${getCarImages(car)[0] || 'https://placehold.co/800x500/1f2937/ffffff?text=Auto'}" alt="${car.title}" class="promo-image" />
+              <span class="promo-overlay"></span>
+              <span class="promo-caption">
+                <span class="promo-kicker">Реклама</span>
+                <span class="promo-title">${car.title}</span>
+                <span class="promo-price-wrap">${renderPriceBlock(car)}</span>
+              </span>
+            </button>
+          </article>
+        `).join('')}
+      </div>
+      <div class="promo-dots car-carousel-dots">
+        ${promoCars.map((_, index) => `<span class="car-carousel-dot${index === 0 ? ' is-active' : ''}"></span>`).join('')}
+      </div>
+    </div>
+  `;
+
+  initCarousels(promoSection);
+  setupDiscountCountdowns();
+}
+
+async function loadPromoCars() {
+  const res = await fetch(`/api/cars?tg_id=${tgId}`);
+  if (!res.ok) return;
+
+  const data = await res.json();
+  promoCars = (data.cars || []).filter((car) => Number(car.is_advertised || 0) === 1 && Number(car.is_active || 0) === 1);
+  renderPromoCars();
 }
 
 function renderDealerships() {
@@ -440,8 +494,12 @@ function renderCarMedia(car) {
 function initCarousels(root = document) {
   root.querySelectorAll('[data-carousel]').forEach((carousel) => {
     const track = carousel.querySelector('[data-carousel-track]');
-    const slides = [...track.querySelectorAll('.car-carousel-image')];
+    if (!track) return;
+
+    const slides = [...track.children];
     const dots = [...carousel.querySelectorAll('.car-carousel-dot')];
+    const prevBtn = carousel.querySelector('[data-carousel-prev]');
+    const nextBtn = carousel.querySelector('[data-carousel-next]');
     if (slides.length < 2) return;
 
     let currentIndex = 0;
@@ -452,16 +510,31 @@ function initCarousels(root = document) {
       dots.forEach((dot, index) => dot.classList.toggle('is-active', index === currentIndex));
     };
 
-    const next = () => {
+    const goNext = () => {
       currentIndex = (currentIndex + 1) % slides.length;
       update();
     };
 
-    let timer = window.setInterval(next, 3000);
+    const goPrev = () => {
+      currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+      update();
+    };
+
+    let timer = window.setInterval(goNext, 3000);
     const resetTimer = () => {
       window.clearInterval(timer);
-      timer = window.setInterval(next, 3000);
+      timer = window.setInterval(goNext, 3000);
     };
+
+    prevBtn?.addEventListener('click', () => {
+      goPrev();
+      resetTimer();
+    });
+
+    nextBtn?.addEventListener('click', () => {
+      goNext();
+      resetTimer();
+    });
 
     carousel.addEventListener('touchstart', (event) => {
       touchStartX = event.changedTouches[0].clientX;
@@ -470,10 +543,8 @@ function initCarousels(root = document) {
     carousel.addEventListener('touchend', (event) => {
       const delta = event.changedTouches[0].clientX - touchStartX;
       if (Math.abs(delta) < 40) return;
-      currentIndex = delta < 0
-        ? (currentIndex + 1) % slides.length
-        : (currentIndex - 1 + slides.length) % slides.length;
-      update();
+      if (delta < 0) goNext();
+      else goPrev();
       resetTimer();
     }, { passive: true });
   });
@@ -541,11 +612,12 @@ async function loadCars() {
   renderCars();
 }
 
-window.openCar = async (id) => {
+window.openCar = async (id, source = 'catalog') => {
   const res = await fetch(`/api/cars/${id}?tg_id=${tgId}`);
   if (!res.ok) return;
 
   const car = await res.json();
+  currentCarSource = source;
   closeCarDetails();
   carDetailsContent.innerHTML = `
     <article class="card car-details-card">
@@ -571,6 +643,7 @@ window.openCar = async (id) => {
   }
 
   carsSection.classList.add('hidden');
+  promoSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   carDetailsSection.classList.remove('hidden');
   initCarousels(carDetailsSection);
@@ -603,6 +676,7 @@ window.fillEdit = async (id) => {
   document.getElementById('discount_price').value = car.discount_price || '';
   document.getElementById('discount_until').value = car.discount_until ? String(car.discount_until).slice(0, 16) : '';
   document.getElementById('is_hot').checked = Number(car.is_hot || 0) === 1;
+  document.getElementById('is_advertised').checked = Number(car.is_advertised || 0) === 1;
   document.getElementById('currency').value = car.currency || 'UZS';
   document.getElementById('engine').value = car.engine;
   document.getElementById('description').value = car.description;
@@ -624,6 +698,7 @@ cancelEditBtn.addEventListener('click', () => {
   document.getElementById('carId').value = '';
   imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   document.getElementById('is_hot').checked = false;
+  document.getElementById('is_advertised').checked = false;
   cancelEditBtn.classList.add('hidden');
   deleteCarBtn.classList.add('hidden');
   adminStatus.textContent = '';
@@ -696,6 +771,7 @@ deleteCarBtn.addEventListener('click', async () => {
     cancelEditBtn.classList.add('hidden');
     deleteCarBtn.classList.add('hidden');
     await loadCars();
+    await loadPromoCars();
   } else {
     adminStatus.textContent = '❌ Не удалось удалить машину';
   }
@@ -716,6 +792,7 @@ adminForm.addEventListener('submit', async (e) => {
       discount_price: document.getElementById('discount_price').value.trim(),
       discount_until: document.getElementById('discount_until').value,
       is_hot: document.getElementById('is_hot').checked ? 1 : 0,
+      is_advertised: document.getElementById('is_advertised').checked ? 1 : 0,
       currency: document.getElementById('currency').value,
       engine: document.getElementById('engine').value.trim(),
       description: document.getElementById('description').value.trim(),
@@ -744,6 +821,7 @@ adminForm.addEventListener('submit', async (e) => {
       cancelEditBtn.classList.add('hidden');
       deleteCarBtn.classList.add('hidden');
       await loadCars();
+      await loadPromoCars();
     } else {
       adminStatus.textContent = '❌ Ошибка сохранения. Проверьте права и заполнение полей.';
     }
@@ -776,6 +854,7 @@ dealershipForm.addEventListener('submit', async (e) => {
   if (res.ok) {
     dealershipStatus.textContent = '✅ Контакты автосалона обновлены';
     await loadDealerships();
+    await loadPromoCars();
     currentDealership = dealerships.find((item) => item.id === payload.id) || currentDealership;
     fillLocation();
     fillDealershipDescription();
@@ -824,7 +903,14 @@ document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {
 
 document.getElementById('backToDealerships').addEventListener('click', openDealershipList);
 document.getElementById('backToSubmenuFromCars').addEventListener('click', openSubmenu);
-document.getElementById('backToCarsFromDetails').addEventListener('click', () => openCarsFromDetails());
+document.getElementById('backToCarsFromDetails').addEventListener('click', () => {
+  if (currentCarSource === 'promo' && !currentDealership) {
+    closeCarDetails();
+    openDealershipList();
+    return;
+  }
+  openCarsFromDetails();
+});
 document.getElementById('backToSubmenuFromSupport').addEventListener('click', openSubmenu);
 document.getElementById('backToSubmenuFromLocation').addEventListener('click', openSubmenu);
 carSearchInput.addEventListener('input', renderCars);
@@ -853,6 +939,7 @@ window.addEventListener('popstate', () => {
   }
 
   await loadDealerships();
+  await loadPromoCars();
   openDealershipList();
   updateSocialBar();
   await splashPromise;

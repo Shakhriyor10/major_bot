@@ -23,10 +23,10 @@ from aiogram.types import (
     WebAppInfo,
 )
 
-# BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
-BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
-WEBAPP_BASE_URL = "https://app.majormotors.uz"
-# WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
+BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
+# BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
+# WEBAPP_BASE_URL = "https://app.majormotors.uz"
+WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
 SUPPORT_GROUP_ID = -1003739992037
 ADMIN_IDS = {
     int(user_id.strip())
@@ -169,6 +169,7 @@ def init_db() -> None:
             discount_price TEXT NOT NULL DEFAULT '',
             discount_until TEXT NOT NULL DEFAULT '',
             is_hot INTEGER NOT NULL DEFAULT 0,
+            is_advertised INTEGER NOT NULL DEFAULT 0,
             is_active INTEGER NOT NULL DEFAULT 1,
             position INTEGER NOT NULL DEFAULT 1000,
             created_at TEXT NOT NULL
@@ -200,6 +201,8 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN discount_until TEXT NOT NULL DEFAULT ''")
     if "is_hot" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN is_hot INTEGER NOT NULL DEFAULT 0")
+    if "is_advertised" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN is_advertised INTEGER NOT NULL DEFAULT 0")
     if "position" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN position INTEGER NOT NULL DEFAULT 1000")
     dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
@@ -525,9 +528,9 @@ def add_car(fields: list[str]) -> int:
         INSERT INTO cars (
             dealership_id, position, brand, title, price, currency, year, mileage,
             engine, transmission, description, image_url, image_url_2, image_url_3,
-            image_url_4, image_url_5, video_url, discount_price, discount_until, is_hot, is_active, created_at
+            image_url_4, image_url_5, video_url, discount_price, discount_until, is_hot, is_advertised, is_active, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -543,7 +546,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, discount_price=?, discount_until=?, is_hot=?, is_active=?
+        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, discount_price=?, discount_until=?, is_hot=?, is_advertised=?, is_active=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -653,6 +656,13 @@ def parse_hot_flag(raw_value: Any) -> int:
     return 0
 
 
+def parse_advertised_flag(raw_value: Any) -> int:
+    value = str(raw_value).strip().lower()
+    if value in {"1", "true", "yes", "on", "ad", "ads", "реклама"}:
+        return 1
+    return 0
+
+
 def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     dealership_id_raw = _required_text(payload, "dealership_id")
     position_raw = _required_text(payload, "position")
@@ -686,6 +696,7 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         discount_price = ""
         discount_until = ""
     is_hot = parse_hot_flag(payload.get("is_hot", 0))
+    is_advertised = parse_advertised_flag(payload.get("is_advertised", 0))
     is_active = parse_active_flag(payload.get("is_active", 1))
     return [
         str(dealership_id),
@@ -708,6 +719,7 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         discount_price,
         discount_until,
         str(is_hot),
+        str(is_advertised),
         str(is_active),
     ]
 
@@ -881,7 +893,7 @@ async def addcar_cmd(message: Message) -> None:
         if not parts[0] or not parts[1] or not parts[5]:
             await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
             return
-        car_id = add_car(parts + ["", "", "", "", "", "", "0", "1"])
+        car_id = add_car(parts + ["", "", "", "", "", "", "0", "0", "1"])
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
         return
 

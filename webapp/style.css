@@ -581,3 +581,121 @@ textarea { min-height: 90px; }
 .car-details-card {
   margin-bottom: 14px;
 }
+
+
+.promo-carousel {
+  position: relative;
+  overflow: hidden;
+}
+
+.promo-carousel-track {
+  display: flex;
+  transition: transform 0.45s cubic-bezier(.22, .61, .36, 1);
+}
+
+.promo-slide {
+  min-width: 100%;
+}
+
+.promo-media-btn {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  text-align: left;
+  color: #fff;
+}
+
+.promo-image {
+  display: block;
+  width: 100%;
+  height: clamp(220px, 38vw, 360px);
+  object-fit: cover;
+}
+
+.promo-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.1) 20%, rgba(10, 10, 10, 0.75) 100%);
+}
+
+.promo-caption {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.promo-kicker {
+  width: fit-content;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 68, 68, 0.9);
+}
+
+.promo-title {
+  font-size: clamp(20px, 3.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.1;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.promo-price-wrap .price,
+.promo-price-wrap .price-original,
+.promo-price-wrap .price-discount {
+  color: #fff;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.promo-price-wrap .price-original {
+  opacity: 0.8;
+}
+
+.promo-price-wrap .discount-timer {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.65);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.promo-dots {
+  bottom: 12px;
+}
+
+
+.promo-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-nav-prev { left: 12px; }
+.promo-nav-next { right: 12px; }
+
+.promo-nav:hover {
+  background: rgba(0, 0, 0, 0.55);
+}

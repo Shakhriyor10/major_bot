@@ -358,25 +358,23 @@ function renderPromoCars() {
 
   promoSection.classList.remove('hidden');
   promoSection.innerHTML = `
-    <div class="promo-header">
-      <h2>Реклама автомобилей</h2>
-      <p class="subtitle">Лучшие предложения автосалонов</p>
-    </div>
     <div class="promo-carousel" data-carousel>
       <div class="promo-carousel-track" data-carousel-track>
         ${promoCars.map((car) => `
           <article class="promo-slide">
             <button class="promo-media-btn" onclick="openCar(${car.id}, 'promo')">
               <img src="${getCarImages(car)[0] || 'https://placehold.co/800x500/1f2937/ffffff?text=Auto'}" alt="${car.title}" class="promo-image" />
+              <span class="promo-overlay"></span>
+              <span class="promo-caption">
+                <span class="promo-kicker">Реклама</span>
+                <span class="promo-title">${car.title}</span>
+                <span class="promo-price-wrap">${renderPriceBlock(car)}</span>
+              </span>
             </button>
-            <div class="promo-body">
-              <h3>${car.title}</h3>
-              ${renderPriceBlock(car)}
-            </div>
           </article>
         `).join('')}
       </div>
-      <div class="car-carousel-dots">
+      <div class="promo-dots car-carousel-dots">
         ${promoCars.map((_, index) => `<span class="car-carousel-dot${index === 0 ? ' is-active' : ''}"></span>`).join('')}
       </div>
     </div>

@@ -1291,6 +1291,11 @@ async def api_admin_check(request: web.Request) -> web.Response:
     tg_id = int(request.query.get("tg_id", "0"))
     return web.json_response({"is_admin": is_admin(tg_id)})
 
+
+async def api_registration_check(request: web.Request) -> web.Response:
+    tg_id = int(request.query.get("tg_id", "0"))
+    return web.json_response({"is_registered": bool(tg_id and get_user_phone(tg_id))})
+
 async def api_support(request: web.Request) -> web.Response:
     data = await request.json()
     user_id = int(data.get("tg_id", 0))
@@ -1302,6 +1307,8 @@ async def api_support(request: web.Request) -> web.Response:
     bot: Bot = request.app["bot"]
     if not SUPPORT_GROUP_ID:
         return web.json_response({"ok": False, "error": "group_not_set"}, status=500)
+    if not get_user_phone(user_id):
+        return web.json_response({"ok": False, "error": "not_registered"}, status=403)
 
     user_display = get_user_display(user_id)
     user_phone = get_user_phone(user_id) or "Не указан"
@@ -1327,6 +1334,7 @@ async def run_web(bot: Bot) -> None:
     app.router.add_post("/api/upload-image", api_upload_image)
     app.router.add_put("/api/dealerships/{dealership_id}", api_manage_dealership)
     app.router.add_get("/api/is-admin", api_admin_check)
+    app.router.add_get("/api/is-registered", api_registration_check)
     app.router.add_post("/api/support", api_support)
     app.router.add_static("/webapp", path="webapp", show_index=False)
 

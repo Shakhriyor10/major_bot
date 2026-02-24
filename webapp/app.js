@@ -219,6 +219,35 @@ function openSupport() {
   updateSocialBar();
 }
 
+async function ensureRegisteredForSupport() {
+  const status = document.getElementById('status');
+  const supportInput = document.getElementById('supportText');
+  const supportSendButton = document.getElementById('sendSupport');
+  const registrationLink = 'https://t.me/MajorSamarkandBOT';
+  const res = await fetch(`/api/is-registered?tg_id=${tgId}`);
+
+  if (!res.ok) {
+    supportInput.classList.add('hidden');
+    supportSendButton.classList.add('hidden');
+    status.textContent = '❌ Не удалось проверить регистрацию. Попробуйте позже.';
+    return false;
+  }
+
+  const data = await res.json();
+  if (!data.is_registered) {
+    openSupport();
+    supportInput.classList.add('hidden');
+    supportSendButton.classList.add('hidden');
+    status.innerHTML = `Вы не зарегистрированы в боте, пожалуйста зарегистрируйтесь: <a href="${registrationLink}" target="_blank" rel="noopener noreferrer">${registrationLink}</a>`;
+    return false;
+  }
+
+  supportInput.classList.remove('hidden');
+  supportSendButton.classList.remove('hidden');
+  status.textContent = '';
+  return true;
+}
+
 function openLocation() {
   submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
@@ -779,12 +808,15 @@ document.getElementById('sendSupport').addEventListener('click', async () => {
 });
 
 document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     if (btn.dataset.target === 'carsSection') {
       openCars();
     } else if (btn.dataset.target === 'locationSection') {
       openLocation();
     } else {
+      if (!(await ensureRegisteredForSupport())) {
+        return;
+      }
       openSupport();
     }
   });

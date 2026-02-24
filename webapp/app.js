@@ -612,12 +612,29 @@ async function loadCars() {
   renderCars();
 }
 
+async function setCurrentDealershipById(dealershipId) {
+  const normalizedId = Number(dealershipId);
+  if (!normalizedId) return;
+
+  const nextDealership = dealerships.find((item) => item.id === normalizedId);
+  if (!nextDealership) return;
+
+  currentDealership = nextDealership;
+  updateHeaderTitle();
+  fillLocation();
+  fillDealershipDescription();
+  await loadCars();
+}
+
 window.openCar = async (id, source = 'catalog') => {
   const res = await fetch(`/api/cars/${id}?tg_id=${tgId}`);
   if (!res.ok) return;
 
   const car = await res.json();
   currentCarSource = source;
+  if (source === 'promo') {
+    await setCurrentDealershipById(car.dealership_id);
+  }
   closeCarDetails();
   carDetailsContent.innerHTML = `
     <article class="card car-details-card">
@@ -642,8 +659,12 @@ window.openCar = async (id, source = 'catalog') => {
     descriptionNode.textContent = String(car.description || '');
   }
 
+  dealershipSection.classList.add('hidden');
+  submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   promoSection.classList.add('hidden');
+  supportSection.classList.add('hidden');
+  locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   carDetailsSection.classList.remove('hidden');
   initCarousels(carDetailsSection);
@@ -904,11 +925,6 @@ document.querySelectorAll('.menu-card[data-target]').forEach((btn) => {
 document.getElementById('backToDealerships').addEventListener('click', openDealershipList);
 document.getElementById('backToSubmenuFromCars').addEventListener('click', openSubmenu);
 document.getElementById('backToCarsFromDetails').addEventListener('click', () => {
-  if (currentCarSource === 'promo' && !currentDealership) {
-    closeCarDetails();
-    openDealershipList();
-    return;
-  }
   openCarsFromDetails();
 });
 document.getElementById('backToSubmenuFromSupport').addEventListener('click', openSubmenu);

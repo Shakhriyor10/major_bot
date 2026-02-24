@@ -320,7 +320,8 @@ function applySocialLink(anchor, url) {
 
 function updateSocialBar() {
   const isDealershipSelectionVisible = !dealershipSection.classList.contains('hidden');
-  if (!currentDealership || isDealershipSelectionVisible) {
+  const isCarDetailsVisible = !carDetailsSection.classList.contains('hidden');
+  if (!currentDealership || isDealershipSelectionVisible || isCarDetailsVisible) {
     socialBar.classList.add('hidden');
     return;
   }
@@ -659,8 +660,12 @@ window.openCar = async (id, source = 'catalog') => {
     descriptionNode.textContent = String(car.description || '');
   }
 
+  dealershipSection.classList.add('hidden');
+  submenuSection.classList.add('hidden');
   carsSection.classList.add('hidden');
   promoSection.classList.add('hidden');
+  supportSection.classList.add('hidden');
+  locationSection.classList.add('hidden');
   adminBox.classList.add('hidden');
   carDetailsSection.classList.remove('hidden');
   initCarousels(carDetailsSection);

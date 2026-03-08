@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-API_KEY = os.getenv("OPENAI_API_KEY", "")
+API_KEY = os.getenv("OPENAI_API_KEY", "").strip().strip("\"").strip("'")
 client = OpenAI(api_key=API_KEY)
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 # BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
@@ -42,7 +42,7 @@ ADMIN_IDS = {
 
 DB_PATH = "dealership.db"
 UPLOADS_DIR = os.path.join("webapp", "uploads")
-AI_DESCRIPTION_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+AI_DESCRIPTION_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 _openai_client: OpenAI | None = None
 
 router = Router()
@@ -58,7 +58,7 @@ ADD_CAR_STEPS = [
     ("mileage", "Введите пробег (например: 45 000 км):"),
     ("engine", "Введите двигатель (например: 3.0 л, 340 л.с.):"),
     ("transmission", "Введите коробку передач (например: Автомат):"),
-    ("description", "Введите описание автомобиля:"),
+    ("description", "Введите описание автомобиля (можно оставить '-' для автогенерации ИИ):"),
     ("image_url", "Отправьте фото автомобиля (или '-' для стандартного изображения):"),
     ("video_url", "Введите ссылку на видео (YouTube, можно '-' если без видео):"),
 ]
@@ -124,6 +124,31 @@ def build_ai_description_prompt(car: dict[str, Any]) -> str:
     )
 
 
+def build_template_description(car: dict[str, Any]) -> str:
+    brand = str(car.get("brand", "Автомобиль")).strip() or "Автомобиль"
+    title = str(car.get("title", "")).strip()
+    year = str(car.get("year", "—")).strip() or "—"
+    mileage = str(car.get("mileage", "—")).strip() or "—"
+    engine = str(car.get("engine", "—")).strip() or "—"
+    transmission = str(car.get("transmission", "—")).strip() or "—"
+    price = str(car.get("price", "—")).strip() or "—"
+    currency = str(car.get("currency", "")).strip()
+    name = title or brand
+    price_line = f"{price} {currency}".strip()
+
+    return (
+        f"{name} {year} года — практичный и комфортный вариант для ежедневных поездок и дальних маршрутов. "
+        f"Автомобиль с понятной историей эксплуатации и сбалансированными характеристиками по динамике и удобству.\n\n"
+        f"По комплектации и технике: двигатель {engine}, коробка передач {transmission}, пробег {mileage}. "
+        f"Текущая цена — {price_line}. Машина подойдет тем, кто ищет надежный автомобиль без лишних переплат.\n\n"
+        "Ключевые плюсы:\n"
+        f"- Понятная конфигурация: {engine}, {transmission}.\n"
+        f"- Актуальный пробег: {mileage}.\n"
+        f"- Год выпуска: {year}.\n"
+        f"- Конкурентная цена: {price_line}."
+    )
+
+
 async def generate_ai_description(car: dict[str, Any]) -> str | None:
     client = get_openai_client()
     if client is None:
@@ -144,6 +169,16 @@ async def generate_ai_description(car: dict[str, Any]) -> str | None:
         return text if text else None
 
     return await asyncio.to_thread(_request)
+
+
+async def ensure_car_description(car: dict[str, Any]) -> str:
+    current = str(car.get("description", "")).strip()
+    if current and current != "-":
+        return current
+    generated = await generate_ai_description({**car, "description": ""})
+    if generated:
+        return generated
+    return build_template_description(car)
 
 
 def init_db() -> None:
@@ -730,7 +765,7 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     price = _required_text(payload, "price")
     engine = _required_text(payload, "engine")
     description = _required_text(payload, "description")
-    if not all([brand, title, price, engine, description, dealership_id, currency, position]):
+    if not all([brand, title, price, engine, dealership_id, currency, position]):
         return None
 
     image_urls = [
@@ -948,6 +983,21 @@ async def addcar_cmd(message: Message) -> None:
         if not parts[0] or not parts[1] or not parts[5]:
             await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
             return
+        if parts[10] == "-":
+            parts[10] = ""
+        parts[10] = await ensure_car_description(
+            {
+                "brand": parts[2],
+                "title": parts[3],
+                "price": parts[4],
+                "currency": parts[5],
+                "year": parts[6],
+                "mileage": parts[7],
+                "engine": parts[8],
+                "transmission": parts[9],
+                "description": parts[10],
+            }
+        )
         car_id = add_car(parts + ["", "", "", "", "", "", "0", "0", "1"])
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
         return
@@ -991,22 +1041,24 @@ async def addcar_step_handler(message: Message) -> None:
     if draft is None:
         return
 
-    text_value = (message.text or "").strip()
-    if not text_value:
-        await message.answer("Пустое значение. Отправьте текст для текущего шага.")
-        return
-    if text_value.startswith("/"):
-        return
-
     next_step = _get_next_addcar_step(draft)
     if not next_step:
         ADMIN_CAR_DRAFTS.pop(message.from_user.id, None)
         return
 
     key, _ = next_step
+    text_value = (message.text or "").strip()
+    if text_value.startswith("/"):
+        return
+    if not text_value and key != "description":
+        await message.answer("Пустое значение. Отправьте текст для текущего шага.")
+        return
+
     if key == "image_url" and text_value != "-":
         await message.answer("На этом шаге отправьте фото автомобиля или '-' для стандартного изображения.")
         return
+    if key == "description" and text_value == "-":
+        text_value = ""
     draft[key] = text_value
 
     if key == "dealership":
@@ -1045,6 +1097,20 @@ async def addcar_step_handler(message: Message) -> None:
         await message.answer(next_prompt)
         return
 
+    description = await ensure_car_description(
+        {
+            "brand": draft["brand"],
+            "title": draft["title"],
+            "price": draft["price"],
+            "currency": draft["currency"],
+            "year": draft["year"],
+            "mileage": draft["mileage"],
+            "engine": draft["engine"],
+            "transmission": draft["transmission"],
+            "description": draft["description"],
+        }
+    )
+
     fields = [
         draft["dealership"],
         draft["position"],
@@ -1056,13 +1122,17 @@ async def addcar_step_handler(message: Message) -> None:
         draft["mileage"],
         draft["engine"],
         draft["transmission"],
-        draft["description"],
+        description,
         draft["image_url"],
         "",
         "",
         "",
         "",
         draft["video_url"],
+        "",
+        "",
+        "0",
+        "0",
         "1",
     ]
     car_id = add_car(fields)
@@ -1087,7 +1157,22 @@ async def editcar_cmd(message: Message) -> None:
     if not parts[1] or not parts[2] or not parts[6]:
         await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
         return
-    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "", "", "0", "1"])
+    if parts[11] == "-":
+        parts[11] = ""
+    parts[11] = await ensure_car_description(
+        {
+            "brand": parts[3],
+            "title": parts[4],
+            "price": parts[5],
+            "currency": parts[6],
+            "year": parts[7],
+            "mileage": parts[8],
+            "engine": parts[9],
+            "transmission": parts[10],
+            "description": parts[11],
+        }
+    )
+    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "", "", "", "0", "0", "1"])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")
 
 
@@ -1308,14 +1393,16 @@ async def api_car_description(request: web.Request) -> web.Response:
     if not car:
         return web.json_response({"ok": False, "error": "not_found"}, status=404)
 
-    ai_description = await generate_ai_description(car)
-    if ai_description:
-        return web.json_response({"ok": True, "description": ai_description, "source": "ai"})
+    stored = str(car.get("description", "")).strip()
+    if stored and stored != "-":
+        return web.json_response({"ok": True, "description": stored, "source": "stored"})
 
-    fallback = str(car.get("description", "")).strip()
-    if not fallback:
-        fallback = "Описание временно недоступно. Попробуйте чуть позже."
-    return web.json_response({"ok": True, "description": fallback, "source": "fallback"})
+    generated = await generate_ai_description({**car, "description": ""})
+    if generated:
+        return web.json_response({"ok": True, "description": generated, "source": "ai"})
+
+    template = build_template_description(car)
+    return web.json_response({"ok": True, "description": template, "source": "template"})
 
 async def api_manage_car(request: web.Request) -> web.Response:
     data = await request.json() if request.can_read_body else {}
@@ -1333,6 +1420,21 @@ async def api_manage_car(request: web.Request) -> web.Response:
     fields = build_car_fields(data)
     if fields is None:
         return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+
+    if not fields[10]:
+        fields[10] = await ensure_car_description(
+            {
+                "brand": fields[2],
+                "title": fields[3],
+                "price": fields[4],
+                "currency": fields[5],
+                "year": fields[6],
+                "mileage": fields[7],
+                "engine": fields[8],
+                "transmission": fields[9],
+                "description": fields[10],
+            }
+        )
 
     if request.method == "POST":
         car_id = add_car(fields)

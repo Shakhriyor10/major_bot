@@ -146,6 +146,14 @@ async def generate_ai_description(car: dict[str, Any]) -> str | None:
     return await asyncio.to_thread(_request)
 
 
+async def ensure_car_description(car: dict[str, Any]) -> str:
+    current = str(car.get("description", "")).strip()
+    if current and current != "-":
+        return current
+    generated = await generate_ai_description({**car, "description": ""})
+    return generated or ""
+
+
 def init_db() -> None:
     os.makedirs(UPLOADS_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -948,6 +956,21 @@ async def addcar_cmd(message: Message) -> None:
         if not parts[0] or not parts[1] or not parts[5]:
             await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
             return
+        if parts[10] == "-":
+            parts[10] = ""
+        parts[10] = await ensure_car_description(
+            {
+                "brand": parts[2],
+                "title": parts[3],
+                "price": parts[4],
+                "currency": parts[5],
+                "year": parts[6],
+                "mileage": parts[7],
+                "engine": parts[8],
+                "transmission": parts[9],
+                "description": parts[10],
+            }
+        )
         car_id = add_car(parts + ["", "", "", "", "", "", "0", "0", "1"])
         await message.answer(f"✅ Машина добавлена. ID: {car_id}")
         return
@@ -1047,6 +1070,20 @@ async def addcar_step_handler(message: Message) -> None:
         await message.answer(next_prompt)
         return
 
+    description = await ensure_car_description(
+        {
+            "brand": draft["brand"],
+            "title": draft["title"],
+            "price": draft["price"],
+            "currency": draft["currency"],
+            "year": draft["year"],
+            "mileage": draft["mileage"],
+            "engine": draft["engine"],
+            "transmission": draft["transmission"],
+            "description": draft["description"],
+        }
+    )
+
     fields = [
         draft["dealership"],
         draft["position"],
@@ -1058,7 +1095,7 @@ async def addcar_step_handler(message: Message) -> None:
         draft["mileage"],
         draft["engine"],
         draft["transmission"],
-        draft["description"],
+        description,
         draft["image_url"],
         "",
         "",
@@ -1093,7 +1130,22 @@ async def editcar_cmd(message: Message) -> None:
     if not parts[1] or not parts[2] or not parts[6]:
         await message.answer("❌ Неверный автосалон, позиция или валюта. Используйте ID автосалона, позицию > 0 и USD/UZS.")
         return
-    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "", "", "0", "1"])
+    if parts[11] == "-":
+        parts[11] = ""
+    parts[11] = await ensure_car_description(
+        {
+            "brand": parts[3],
+            "title": parts[4],
+            "price": parts[5],
+            "currency": parts[6],
+            "year": parts[7],
+            "mileage": parts[8],
+            "engine": parts[9],
+            "transmission": parts[10],
+            "description": parts[11],
+        }
+    )
+    ok = edit_car(int(parts[0]), parts[1:] + ["", "", "", "", "", "", "", "0", "0", "1"])
     await message.answer("✅ Машина обновлена" if ok else "❌ Машина не найдена")
 
 
@@ -1339,6 +1391,21 @@ async def api_manage_car(request: web.Request) -> web.Response:
     fields = build_car_fields(data)
     if fields is None:
         return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+
+    if not fields[10]:
+        fields[10] = await ensure_car_description(
+            {
+                "brand": fields[2],
+                "title": fields[3],
+                "price": fields[4],
+                "currency": fields[5],
+                "year": fields[6],
+                "mileage": fields[7],
+                "engine": fields[8],
+                "transmission": fields[9],
+                "description": fields[10],
+            }
+        )
 
     if request.method == "POST":
         car_id = add_car(fields)

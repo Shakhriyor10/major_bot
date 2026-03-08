@@ -22,7 +22,8 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     WebAppInfo,
 )
-
+from openai import OpenAI
+API_KEY = ""
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 # BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
 # WEBAPP_BASE_URL = "https://app.majormotors.uz"

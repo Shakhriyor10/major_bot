@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-API_KEY = os.getenv("OPENAI_API_KEY", "")
+API_KEY = os.getenv("OPENAI_API_KEY", "").strip().strip("\"").strip("'")
 client = OpenAI(api_key=API_KEY)
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 # BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
@@ -42,7 +42,7 @@ ADMIN_IDS = {
 
 DB_PATH = "dealership.db"
 UPLOADS_DIR = os.path.join("webapp", "uploads")
-AI_DESCRIPTION_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+AI_DESCRIPTION_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 _openai_client: OpenAI | None = None
 
 router = Router()
@@ -1065,6 +1065,10 @@ async def addcar_step_handler(message: Message) -> None:
         "",
         "",
         draft["video_url"],
+        "",
+        "",
+        "0",
+        "0",
         "1",
     ]
     car_id = add_car(fields)

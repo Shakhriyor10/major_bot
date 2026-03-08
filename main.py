@@ -58,7 +58,7 @@ ADD_CAR_STEPS = [
     ("mileage", "Введите пробег (например: 45 000 км):"),
     ("engine", "Введите двигатель (например: 3.0 л, 340 л.с.):"),
     ("transmission", "Введите коробку передач (например: Автомат):"),
-    ("description", "Введите описание автомобиля:"),
+    ("description", "Введите описание автомобиля (можно оставить '-' для автогенерации ИИ):"),
     ("image_url", "Отправьте фото автомобиля (или '-' для стандартного изображения):"),
     ("video_url", "Введите ссылку на видео (YouTube, можно '-' если без видео):"),
 ]
@@ -730,7 +730,7 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     price = _required_text(payload, "price")
     engine = _required_text(payload, "engine")
     description = _required_text(payload, "description")
-    if not all([brand, title, price, engine, description, dealership_id, currency, position]):
+    if not all([brand, title, price, engine, dealership_id, currency, position]):
         return None
 
     image_urls = [
@@ -991,22 +991,24 @@ async def addcar_step_handler(message: Message) -> None:
     if draft is None:
         return
 
-    text_value = (message.text or "").strip()
-    if not text_value:
-        await message.answer("Пустое значение. Отправьте текст для текущего шага.")
-        return
-    if text_value.startswith("/"):
-        return
-
     next_step = _get_next_addcar_step(draft)
     if not next_step:
         ADMIN_CAR_DRAFTS.pop(message.from_user.id, None)
         return
 
     key, _ = next_step
+    text_value = (message.text or "").strip()
+    if text_value.startswith("/"):
+        return
+    if not text_value and key != "description":
+        await message.answer("Пустое значение. Отправьте текст для текущего шага.")
+        return
+
     if key == "image_url" and text_value != "-":
         await message.answer("На этом шаге отправьте фото автомобиля или '-' для стандартного изображения.")
         return
+    if key == "description" and text_value == "-":
+        text_value = ""
     draft[key] = text_value
 
     if key == "dealership":

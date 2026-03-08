@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Автосалон</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/webapp/style.css" />
+</head>
+<body>
+  <div id="startupSplash" class="startup-splash" aria-hidden="true">
+    <div class="startup-splash-track">
+      <img class="startup-logo startup-logo-1" src="/webapp/image/major_logo.png" alt="Major motors" />
+      <img class="startup-logo startup-logo-2" src="/webapp/image/autocenter_logo.png" alt="Autocenter Samarkand" />
+      <img class="startup-logo startup-logo-3" src="/webapp/image/shineray.png" alt="Shineray" />
+    </div>
+  </div>
+
+  <div class="container">
+    <header class="header">
+      <h1 class="title" id="pageTitle">
+        <img id="pageTitleLogo" class="title-logo hidden" src="" alt="Логотип автосалона" />
+        <span id="pageTitleText">Автосалоны</span>
+      </h1>
+<!--      <p class="subtitle">Выберите автосалон, чтобы посмотреть автомобили, контакты и поддержку.</p>-->
+    </header>
+
+
+    <section id="promoSection" class="promo-section hidden"></section>
+
+    <section id="dealershipSection" class="menu-grid"></section>
+
+    <section id="submenuSection" class="hidden">
+      <button id="backToDealerships" class="back-btn">← Назад к автосалонам</button>
+      <div class="menu-grid">
+        <button class="menu-card" data-target="carsSection">
+          <span class="menu-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M4 12l1.6-4.8A2 2 0 0 1 7.5 6h9a2 2 0 0 1 1.9 1.2L20 12v6a1 1 0 1 1-2 0v-1H6v1a1 1 0 1 1-2 0v-6zm2.2-1h11.6l-1.2-3.5a.5.5 0 0 0-.5-.3h-8.2a.5.5 0 0 0-.5.3L6.2 11zM7.5 15a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zm9 0a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/>
+            </svg>
+          </span>
+          <span class="menu-card-content">
+            <span class="menu-card-title">Автомобили</span>
+            <span class="menu-card-subtitle">Каталог выбранного автосалона</span>
+          </span>
+        </button>
+        <button class="menu-card" data-target="locationSection">
+          <span class="menu-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/>
+            </svg>
+          </span>
+          <span class="menu-card-content">
+            <span class="menu-card-title">Адрес и контакты</span>
+            <span class="menu-card-subtitle">Контакты выбранного автосалона</span>
+          </span>
+        </button>
+        <button class="menu-card" data-target="supportSection">
+          <span class="menu-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8l-4 3v-3H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm3 4a1 1 0 0 0 0 2h10a1 1 0 1 0 0-2H7zm0 4a1 1 0 1 0 0 2h7a1 1 0 1 0 0-2H7z"/>
+            </svg>
+          </span>
+          <span class="menu-card-content">
+            <span class="menu-card-title">Поддержка</span>
+            <span class="menu-card-subtitle">Связаться с менеджером</span>
+          </span>
+        </button>
+      </div>
+      <div id="dealershipDescriptionBox" class="dealership-description-box hidden">
+        <h2>Описание автосалона</h2>
+        <p id="dealershipDescriptionText" class="subtitle dealership-description-text"></p>
+      </div>
+    </section>
+
+    <section id="locationSection" class="support-box hidden">
+      <button id="backToSubmenuFromLocation" class="back-btn">← Назад</button>
+      <h2>Адрес и контакты</h2>
+      <p id="locationAddress" class="subtitle location-address"></p>
+<!--      <p class="subtitle location-link-title">Местоположение и ссылка</p>-->
+      <a id="locationLink" class="location-link" href="#" target="_blank" rel="noopener noreferrer">Местоположение</a>
+      <p id="locationPhone" class="location-phone"></p>
+
+      <form id="dealershipForm" class="admin-form hidden">
+        <input id="dealershipAddressInput" placeholder="Адрес" required />
+        <input id="dealershipPhoneInput" placeholder="Телефон" required />
+        <input id="dealershipMapInput" placeholder="Ссылка на карту" required />
+        <textarea id="dealershipDescriptionInput" placeholder="Подробное описание автосалона"></textarea>
+        <input id="dealershipInstagramInput" placeholder="Ссылка Instagram" />
+        <input id="dealershipTelegramInput" placeholder="Ссылка Telegram" />
+        <button type="submit" class="btn">Сохранить контакты</button>
+      </form>
+      <p id="dealershipStatus" class="subtitle"></p>
+    </section>
+
+    <section id="carsSection" class="hidden">
+      <button id="backToSubmenuFromCars" class="back-btn">← Назад</button>
+      <div class="filters-box">
+        <div class="filter-item filter-item-search">
+          <label for="carSearch">Поиск</label>
+          <input id="carSearch" placeholder="Поиск по названию или марке" />
+        </div>
+        <div class="filter-item">
+          <label for="brandFilter">Фильтр по марке</label>
+          <div class="select-wrap">
+            <select id="brandFilter">
+              <option value="">Все марки</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="cars" class="grid"></div>
+    </section>
+
+    <section id="carDetailsSection" class="hidden">
+      <button id="backToCarsFromDetails" class="back-btn">← Назад к списку</button>
+      <div id="carDetailsContent"></div>
+    </section>
+
+    <section id="adminBox" class="support-box hidden">
+      <h2>Панель администратора</h2>
+      <p class="subtitle">Добавление и редактирование автомобиля с выбором автосалона и валюты.</p>
+      <form id="adminForm" class="admin-form">
+        <input type="hidden" id="carId" />
+        <select id="dealership_id" required></select>
+        <input id="position" type="number" min="1" step="1" placeholder="Позиция в списке (1 = сверху)" required />
+        <input id="brand" placeholder="Марка автомобиля" required />
+        <input id="title" placeholder="Название" required />
+        <input id="price" placeholder="Цена (число)" required />
+        <input id="discount_price" placeholder="Цена со скидкой (необязательно)" />
+        <input id="discount_until" type="datetime-local" placeholder="Скидка действует до (необязательно)" />
+        <label class="checkbox-row" for="is_hot">
+          <input id="is_hot" type="checkbox" />
+          <span>Горячий продукт (поднимать наверх)</span>
+        </label>
+        <label class="checkbox-row" for="is_advertised">
+          <input id="is_advertised" type="checkbox" />
+          <span>Реклама (показывать в верхнем баннере на главной)</span>
+        </label>
+        <select id="currency" required>
+          <option value="UZS">Сум (UZS)</option>
+          <option value="USD">Доллар (USD)</option>
+        </select>
+        <input id="engine" placeholder="Объем двигателя" required />
+        <textarea id="description" placeholder="Описание" required></textarea>
+        <input type="file" id="image_file_1" accept="image/*" />
+        <input type="file" id="image_file_2" accept="image/*" />
+        <input type="file" id="image_file_3" accept="image/*" />
+        <input type="file" id="image_file_4" accept="image/*" />
+        <input type="file" id="image_file_5" accept="image/*" />
+        <input id="image_url" placeholder="Ссылка на фото 1 (заполнится автоматически при загрузке)" />
+        <input id="image_url_2" placeholder="Ссылка на фото 2 (необязательно)" />
+        <input id="image_url_3" placeholder="Ссылка на фото 3 (необязательно)" />
+        <input id="image_url_4" placeholder="Ссылка на фото 4 (необязательно)" />
+        <input id="image_url_5" placeholder="Ссылка на фото 5 (необязательно)" />
+        <select id="is_active">
+          <option value="1">Активный</option>
+          <option value="0">Неактивный</option>
+        </select>
+        <input id="video_url" placeholder="Ссылка на видео (YouTube, необязательно)" />
+        <div class="admin-actions">
+          <button type="submit" class="btn">Сохранить</button>
+          <button type="button" id="cancelEdit" class="btn btn-secondary hidden">Отмена</button>
+          <button type="button" id="deleteCar" class="btn btn-danger hidden">Удалить</button>
+        </div>
+      </form>
+      <p id="adminStatus" class="subtitle"></p>
+    </section>
+
+    <section id="supportSection" class="support-box hidden">
+      <button id="backToSubmenuFromSupport" class="back-btn">← Назад</button>
+      <h2>Поддержка</h2>
+<!--      <p class="subtitle">Опишите вопрос, и менеджер ответит вам в Telegram.</p>-->
+      <textarea id="supportText" placeholder="Например: Нужна помощь с выбором кроссовера"></textarea>
+      <button id="sendSupport" class="btn">Отправить в поддержку</button>
+      <p id="status" class="subtitle"></p>
+    </section>
+
+    <footer id="dealershipSocialBar" class="social-bar hidden" aria-label="Социальные сети автосалона">
+      <a id="instagramLink" class="social-link" href="#" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.75a4 4 0 0 0-4 4v8.5a4 4 0 0 0 4 4h8.5a4 4 0 0 0 4-4v-8.5a4 4 0 0 0-4-4h-8.5z"/>
+          <path d="M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 1.75a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5zm5.3-2.25a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/>
+        </svg>
+      </a>
+      <a id="telegramLink" class="social-link" href="#" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
+        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <path d="M21.5 4.2c.4.2.6.7.5 1.1l-3.1 14.5a1 1 0 0 1-1.6.6l-4.8-3.6-2.5 2.4c-.4.4-1 .2-1.2-.3L6.9 14l-4.5-1.7a1 1 0 0 1 0-1.9L20.7 4a1 1 0 0 1 .8.2zM8 13.2l1.2 3.7.4-3.7 6.6-6.2-8.2 6.2zm2.5 1.1l5.8 4.4 2.6-12.1-14 5.2 2.9 1.1 9.3-7a.6.6 0 0 1 .8.9l-7.4 7.5z"/>
+        </svg>
+      </a>
+    </footer>
+  </div>
+
+  <script src="/webapp/app.js"></script>
+</body>
+</html>

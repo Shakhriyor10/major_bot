@@ -23,7 +23,8 @@ from aiogram.types import (
     WebAppInfo,
 )
 from openai import OpenAI
-API_KEY = ""
+
+API_KEY = os.getenv("OPENAI_API_KEY", "")
 BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
 # BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
 # WEBAPP_BASE_URL = "https://app.majormotors.uz"
@@ -37,6 +38,8 @@ ADMIN_IDS = {
 
 DB_PATH = "dealership.db"
 UPLOADS_DIR = os.path.join("webapp", "uploads")
+AI_DESCRIPTION_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+_openai_client: OpenAI | None = None
 
 router = Router()
 
@@ -90,6 +93,53 @@ DEFAULT_DEALERSHIPS = [
         "map_url": "https://www.openstreetmap.org/export/embed.html?bbox=66.96%2C39.65%2C67.00%2C39.70&layer=mapnik",
     },
 ]
+
+
+def get_openai_client() -> OpenAI | None:
+    global _openai_client
+    if not API_KEY:
+        return None
+    if _openai_client is None:
+        _openai_client = OpenAI(api_key=API_KEY)
+    return _openai_client
+
+
+def build_ai_description_prompt(car: dict[str, Any]) -> str:
+    return (
+        "Сгенерируй продающее и честное описание автомобиля на русском языке. "
+        "Формат: 2 коротких абзаца и в конце список из 4 пунктов с ключевыми плюсами. "
+        "Без эмодзи, без выдуманных фактов и без упоминания, что текст написал ИИ.\n\n"
+        f"Марка: {car.get('brand', '')}\n"
+        f"Название: {car.get('title', '')}\n"
+        f"Год: {car.get('year', '')}\n"
+        f"Пробег: {car.get('mileage', '')}\n"
+        f"Двигатель: {car.get('engine', '')}\n"
+        f"Коробка: {car.get('transmission', '')}\n"
+        f"Цена: {car.get('price', '')} {car.get('currency', '')}\n"
+        f"Исходное описание: {car.get('description', '')}"
+    )
+
+
+async def generate_ai_description(car: dict[str, Any]) -> str | None:
+    client = get_openai_client()
+    if client is None:
+        return None
+
+    def _request() -> str | None:
+        try:
+            response = client.responses.create(
+                model=AI_DESCRIPTION_MODEL,
+                input=build_ai_description_prompt(car),
+                max_output_tokens=320,
+            )
+        except Exception:
+            logging.exception("Не удалось сгенерировать AI-описание для машины %s", car.get("id"))
+            return None
+
+        text = (response.output_text or "").strip()
+        return text if text else None
+
+    return await asyncio.to_thread(_request)
 
 
 def init_db() -> None:
@@ -1245,6 +1295,24 @@ async def api_car(request: web.Request) -> web.Response:
     return web.json_response(car)
 
 
+
+
+async def api_car_description(request: web.Request) -> web.Response:
+    car_id = int(request.match_info["car_id"])
+    tg_id = int(request.query.get("tg_id", "0"))
+    car = get_car(car_id, include_inactive=is_admin(tg_id))
+    if not car:
+        return web.json_response({"ok": False, "error": "not_found"}, status=404)
+
+    ai_description = await generate_ai_description(car)
+    if ai_description:
+        return web.json_response({"ok": True, "description": ai_description, "source": "ai"})
+
+    fallback = str(car.get("description", "")).strip()
+    if not fallback:
+        fallback = "Описание временно недоступно. Попробуйте чуть позже."
+    return web.json_response({"ok": True, "description": fallback, "source": "fallback"})
+
 async def api_manage_car(request: web.Request) -> web.Response:
     data = await request.json() if request.can_read_body else {}
     tg_id = int(data.get("tg_id", request.query.get("tg_id", 0)))
@@ -1341,6 +1409,7 @@ async def run_web(bot: Bot) -> None:
     app.router.add_get("/api/cars", api_cars)
     app.router.add_get("/api/dealerships", api_dealerships)
     app.router.add_get("/api/cars/{car_id}", api_car)
+    app.router.add_get("/api/cars/{car_id}/description", api_car_description)
     app.router.add_post("/api/cars", api_manage_car)
     app.router.add_put("/api/cars/{car_id}", api_manage_car)
     app.router.add_delete("/api/cars/{car_id}", api_manage_car)

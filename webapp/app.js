@@ -171,6 +171,18 @@ function setupDiscountCountdowns() {
   countdownTimerId = window.setInterval(tick, 1000);
 }
 
+
+async function fetchGeneratedDescription(carId, fallbackDescription = '') {
+  try {
+    const res = await fetch(`/api/cars/${carId}/description?tg_id=${tgId}`);
+    if (!res.ok) return String(fallbackDescription || '');
+    const data = await res.json();
+    return String(data.description || fallbackDescription || '');
+  } catch (_) {
+    return String(fallbackDescription || '');
+  }
+}
+
 function closeCarDetails() {
   carDetailsSection.classList.add('hidden');
   carDetailsContent.innerHTML = '';
@@ -656,7 +668,9 @@ window.openCar = async (id, source = 'catalog') => {
 
   const descriptionNode = document.getElementById('carDetailsDescriptionText');
   if (descriptionNode) {
-    descriptionNode.textContent = String(car.description || '');
+    descriptionNode.textContent = 'Генерируем описание...';
+    const generated = await fetchGeneratedDescription(id, car.description);
+    descriptionNode.textContent = generated || 'Описание временно недоступно.';
   }
 
   dealershipSection.classList.add('hidden');

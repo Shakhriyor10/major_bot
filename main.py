@@ -124,6 +124,31 @@ def build_ai_description_prompt(car: dict[str, Any]) -> str:
     )
 
 
+def build_template_description(car: dict[str, Any]) -> str:
+    brand = str(car.get("brand", "Автомобиль")).strip() or "Автомобиль"
+    title = str(car.get("title", "")).strip()
+    year = str(car.get("year", "—")).strip() or "—"
+    mileage = str(car.get("mileage", "—")).strip() or "—"
+    engine = str(car.get("engine", "—")).strip() or "—"
+    transmission = str(car.get("transmission", "—")).strip() or "—"
+    price = str(car.get("price", "—")).strip() or "—"
+    currency = str(car.get("currency", "")).strip()
+    name = title or brand
+    price_line = f"{price} {currency}".strip()
+
+    return (
+        f"{name} {year} года — практичный и комфортный вариант для ежедневных поездок и дальних маршрутов. "
+        f"Автомобиль с понятной историей эксплуатации и сбалансированными характеристиками по динамике и удобству.\n\n"
+        f"По комплектации и технике: двигатель {engine}, коробка передач {transmission}, пробег {mileage}. "
+        f"Текущая цена — {price_line}. Машина подойдет тем, кто ищет надежный автомобиль без лишних переплат.\n\n"
+        "Ключевые плюсы:\n"
+        f"- Понятная конфигурация: {engine}, {transmission}.\n"
+        f"- Актуальный пробег: {mileage}.\n"
+        f"- Год выпуска: {year}.\n"
+        f"- Конкурентная цена: {price_line}."
+    )
+
+
 async def generate_ai_description(car: dict[str, Any]) -> str | None:
     client = get_openai_client()
     if client is None:
@@ -151,7 +176,9 @@ async def ensure_car_description(car: dict[str, Any]) -> str:
     if current and current != "-":
         return current
     generated = await generate_ai_description({**car, "description": ""})
-    return generated or ""
+    if generated:
+        return generated
+    return build_template_description(car)
 
 
 def init_db() -> None:
@@ -1366,14 +1393,16 @@ async def api_car_description(request: web.Request) -> web.Response:
     if not car:
         return web.json_response({"ok": False, "error": "not_found"}, status=404)
 
-    ai_description = await generate_ai_description(car)
-    if ai_description:
-        return web.json_response({"ok": True, "description": ai_description, "source": "ai"})
+    stored = str(car.get("description", "")).strip()
+    if stored and stored != "-":
+        return web.json_response({"ok": True, "description": stored, "source": "stored"})
 
-    fallback = str(car.get("description", "")).strip()
-    if not fallback:
-        fallback = "Описание временно недоступно. Попробуйте чуть позже."
-    return web.json_response({"ok": True, "description": fallback, "source": "fallback"})
+    generated = await generate_ai_description({**car, "description": ""})
+    if generated:
+        return web.json_response({"ok": True, "description": generated, "source": "ai"})
+
+    template = build_template_description(car)
+    return web.json_response({"ok": True, "description": template, "source": "template"})
 
 async def api_manage_car(request: web.Request) -> web.Response:
     data = await request.json() if request.can_read_body else {}

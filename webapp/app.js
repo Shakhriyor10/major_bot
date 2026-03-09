@@ -36,6 +36,12 @@ const instagramLink = document.getElementById('instagramLink');
 const telegramLink = document.getElementById('telegramLink');
 const dealershipDescriptionBox = document.getElementById('dealershipDescriptionBox');
 const dealershipDescriptionText = document.getElementById('dealershipDescriptionText');
+const quickOrderForm = document.getElementById('quickOrderForm');
+const quickOrderStatus = document.getElementById('quickOrderStatus');
+const orderCarSelect = document.getElementById('order_car_id');
+const orderStockHint = document.getElementById('orderStockHint');
+const orderTotalHint = document.getElementById('orderTotalHint');
+const customerSuggestions = document.getElementById('customerSuggestions');
 let isAdminUser = false;
 let allCars = [];
 let dealerships = [];
@@ -614,6 +620,7 @@ async function loadCars() {
     allCars = [];
     renderBrandFilter(allCars);
     renderCars();
+    fillOrderProductOptions();
     return;
   }
 
@@ -622,6 +629,7 @@ async function loadCars() {
   allCars = data.cars || [];
   renderBrandFilter(allCars);
   renderCars();
+  fillOrderProductOptions();
 }
 
 async function setCurrentDealershipById(dealershipId) {
@@ -722,6 +730,7 @@ window.fillEdit = async (id) => {
   document.getElementById('image_url_5').value = car.image_url_5 || '';
   document.getElementById('is_active').value = String(car.is_active ?? 1);
   document.getElementById('video_url').value = car.video_url || '';
+  document.getElementById('stock_quantity').value = Number(car.stock_quantity || 0);
   imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   cancelEditBtn.classList.remove('hidden');
   deleteCarBtn.classList.remove('hidden');
@@ -734,6 +743,7 @@ cancelEditBtn.addEventListener('click', () => {
   imageFileInputs.forEach((input) => { if (input) input.value = ''; });
   document.getElementById('is_hot').checked = false;
   document.getElementById('is_advertised').checked = false;
+  document.getElementById('stock_quantity').value = 0;
   cancelEditBtn.classList.add('hidden');
   deleteCarBtn.classList.add('hidden');
   adminStatus.textContent = '';
@@ -838,6 +848,7 @@ adminForm.addEventListener('submit', async (e) => {
       image_url_5: imageUrls[4],
       is_active: Number(document.getElementById('is_active').value),
       video_url: document.getElementById('video_url').value.trim(),
+      stock_quantity: Number(document.getElementById('stock_quantity').value || 0),
     };
 
     const url = carId ? `/api/cars/${carId}` : '/api/cars';
@@ -853,6 +864,7 @@ adminForm.addEventListener('submit', async (e) => {
       adminForm.reset();
       document.getElementById('carId').value = '';
       imageFileInputs.forEach((input) => { if (input) input.value = ''; });
+      document.getElementById('stock_quantity').value = 0;
       cancelEditBtn.classList.add('hidden');
       deleteCarBtn.classList.add('hidden');
       await loadCars();
@@ -864,6 +876,102 @@ adminForm.addEventListener('submit', async (e) => {
     adminStatus.textContent = '❌ Не удалось загрузить фото. Попробуйте другой файл.';
   }
 });
+
+
+function getSelectedOrderCar() {
+  const selectedId = Number(orderCarSelect?.value || 0);
+  return allCars.find((item) => Number(item.id) === selectedId) || null;
+}
+
+function updateOrderHints() {
+  if (!orderCarSelect) return;
+  const car = getSelectedOrderCar();
+  const qty = Number(document.getElementById('order_quantity')?.value || 0);
+  const unit = car ? Number(String(car.price || '').replace(/\D/g, '') || 0) : 0;
+  const stock = car ? Number(car.stock_quantity || 0) : 0;
+  orderStockHint.textContent = `Остаток на складе: ${stock}`;
+  orderTotalHint.textContent = qty > 0 && unit > 0 ? `Общая сумма: ${formatPrice(String(unit * qty), car.currency || 'UZS')}` : 'Общая сумма: —';
+}
+
+function fillOrderProductOptions() {
+  if (!orderCarSelect) return;
+  const options = ['<option value="">Выберите продукт</option>'];
+  allCars.forEach((car) => {
+    options.push(`<option value="${car.id}">${car.title} (${formatPrice(car.price, car.currency)})</option>`);
+  });
+  orderCarSelect.innerHTML = options.join('');
+  updateOrderHints();
+}
+
+async function searchCustomers(query) {
+  const res = await fetch(`/api/customer-search?tg_id=${tgId}&q=${encodeURIComponent(query)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.items || [];
+}
+
+function renderCustomerSuggestions(items) {
+  if (!customerSuggestions) return;
+  if (!items.length) {
+    customerSuggestions.innerHTML = '';
+    return;
+  }
+  customerSuggestions.innerHTML = items.map((item) => `<button type="button" class="customer-suggestion" data-name="${(item.full_name||'').replace(/"/g,'&quot;')}" data-phone="${(item.phone||'').replace(/"/g,'&quot;')}">${item.full_name || 'Без имени'} — ${item.phone}</button>`).join('');
+}
+
+if (quickOrderForm) {
+  orderCarSelect.addEventListener('change', updateOrderHints);
+  document.getElementById('order_quantity').addEventListener('input', updateOrderHints);
+
+  const customerNameInput = document.getElementById('order_customer_name');
+  const customerPhoneInput = document.getElementById('order_customer_phone');
+  const searchHandler = async () => {
+    const q = `${customerNameInput.value.trim()} ${customerPhoneInput.value.trim()}`.trim();
+    if (q.length < 2) {
+      renderCustomerSuggestions([]);
+      return;
+    }
+    renderCustomerSuggestions(await searchCustomers(q));
+  };
+  customerNameInput.addEventListener('input', searchHandler);
+  customerPhoneInput.addEventListener('input', searchHandler);
+
+  customerSuggestions.addEventListener('click', (event) => {
+    const btn = event.target.closest('.customer-suggestion');
+    if (!btn) return;
+    customerNameInput.value = btn.dataset.name || '';
+    customerPhoneInput.value = btn.dataset.phone || '';
+    renderCustomerSuggestions([]);
+  });
+
+  quickOrderForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = {
+      tg_id: tgId,
+      car_id: Number(orderCarSelect.value),
+      customer_name: customerNameInput.value.trim(),
+      customer_phone: customerPhoneInput.value.trim(),
+      quantity: Number(document.getElementById('order_quantity').value || 0),
+      address: document.getElementById('order_address').value.trim(),
+    };
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      quickOrderStatus.textContent = data.error === 'insufficient_stock'
+        ? `❌ Недостаточно на складе. Доступно: ${data.stock_quantity || 0}`
+        : '❌ Не удалось создать заказ';
+      return;
+    }
+    quickOrderStatus.textContent = '✅ Заказ создан';
+    quickOrderForm.reset();
+    renderCustomerSuggestions([]);
+    await loadCars();
+  });
+}
 
 dealershipForm.addEventListener('submit', async (e) => {
   e.preventDefault();

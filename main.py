@@ -226,6 +226,7 @@ def init_db() -> None:
             is_hot INTEGER NOT NULL DEFAULT 0,
             is_advertised INTEGER NOT NULL DEFAULT 0,
             is_active INTEGER NOT NULL DEFAULT 1,
+            stock_quantity INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL DEFAULT 1000,
             created_at TEXT NOT NULL
         )
@@ -260,6 +261,8 @@ def init_db() -> None:
         cur.execute("ALTER TABLE cars ADD COLUMN is_advertised INTEGER NOT NULL DEFAULT 0")
     if "position" not in columns:
         cur.execute("ALTER TABLE cars ADD COLUMN position INTEGER NOT NULL DEFAULT 1000")
+    if "stock_quantity" not in columns:
+        cur.execute("ALTER TABLE cars ADD COLUMN stock_quantity INTEGER NOT NULL DEFAULT 0")
     dealership_columns = {row[1] for row in cur.execute("PRAGMA table_info(dealerships)")}
     if "instagram_url" not in dealership_columns:
         cur.execute("ALTER TABLE dealerships ADD COLUMN instagram_url TEXT NOT NULL DEFAULT ''")
@@ -273,6 +276,23 @@ def init_db() -> None:
             group_message_id INTEGER PRIMARY KEY,
             user_id INTEGER NOT NULL,
             created_at TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            car_id INTEGER NOT NULL,
+            customer_name TEXT NOT NULL,
+            customer_phone TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            unit_price INTEGER NOT NULL,
+            total_price INTEGER NOT NULL,
+            address TEXT NOT NULL,
+            created_by INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(car_id) REFERENCES cars(id)
         )
         """
     )
@@ -583,9 +603,9 @@ def add_car(fields: list[str]) -> int:
         INSERT INTO cars (
             dealership_id, position, brand, title, price, currency, year, mileage,
             engine, transmission, description, image_url, image_url_2, image_url_3,
-            image_url_4, image_url_5, video_url, discount_price, discount_until, is_hot, is_advertised, is_active, created_at
+            image_url_4, image_url_5, video_url, discount_price, discount_until, is_hot, is_advertised, is_active, stock_quantity, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (*fields, datetime.utcnow().isoformat()),
     )
@@ -601,7 +621,7 @@ def edit_car(car_id: int, fields: list[str]) -> bool:
     cur.execute(
         """
         UPDATE cars
-        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, discount_price=?, discount_until=?, is_hot=?, is_advertised=?, is_active=?
+        SET dealership_id=?, position=?, brand=?, title=?, price=?, currency=?, year=?, mileage=?, engine=?, transmission=?, description=?, image_url=?, image_url_2=?, image_url_3=?, image_url_4=?, image_url_5=?, video_url=?, discount_price=?, discount_until=?, is_hot=?, is_advertised=?, is_active=?, stock_quantity=?
         WHERE id=?
         """,
         (*fields, car_id),
@@ -753,6 +773,9 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
     is_hot = parse_hot_flag(payload.get("is_hot", 0))
     is_advertised = parse_advertised_flag(payload.get("is_advertised", 0))
     is_active = parse_active_flag(payload.get("is_active", 1))
+    stock_raw = str(payload.get("stock_quantity", "0") or "0").strip()
+    stock_digits = re.sub(r"\D", "", stock_raw)
+    stock_quantity = int(stock_digits) if stock_digits else 0
     return [
         str(dealership_id),
         str(position),
@@ -776,7 +799,90 @@ def build_car_fields(payload: dict[str, Any]) -> list[str] | None:
         str(is_hot),
         str(is_advertised),
         str(is_active),
+        str(stock_quantity),
     ]
+
+
+def parse_price_to_int(raw_price: Any) -> int:
+    digits = re.sub(r"\D", "", str(raw_price or ""))
+    return int(digits) if digits else 0
+
+
+def search_customers(query: str, limit: int = 5) -> list[dict[str, str]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    wildcard = f"%{query.strip()}%"
+    cur.execute(
+        """
+        SELECT full_name, phone
+        FROM users
+        WHERE trim(phone) != '' AND (full_name LIKE ? OR phone LIKE ?)
+        ORDER BY last_active_at DESC
+        LIMIT ?
+        """,
+        (wildcard, wildcard, limit),
+    )
+    items = [{"full_name": str(row["full_name"] or "").strip(), "phone": str(row["phone"] or "").strip()} for row in cur.fetchall()]
+    conn.close()
+    return items
+
+
+def create_order(*, car_id: int, customer_name: str, customer_phone: str, quantity: int, address: str, created_by: int) -> dict[str, Any] | None:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT id, price, stock_quantity FROM cars WHERE id=?", (car_id,))
+    car = cur.fetchone()
+    if not car:
+        conn.close()
+        return None
+
+    stock_quantity = int(car["stock_quantity"] or 0)
+    if quantity <= 0 or quantity > stock_quantity:
+        conn.close()
+        return {"error": "insufficient_stock", "stock_quantity": stock_quantity}
+
+    unit_price = parse_price_to_int(car["price"])
+    total_price = unit_price * quantity
+
+    cur.execute(
+        """
+        INSERT INTO orders (car_id, customer_name, customer_phone, quantity, unit_price, total_price, address, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (car_id, customer_name, customer_phone, quantity, unit_price, total_price, address, created_by, datetime.utcnow().isoformat()),
+    )
+    cur.execute("UPDATE cars SET stock_quantity = stock_quantity - ? WHERE id=?", (quantity, car_id))
+    order_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return {"id": int(order_id), "total_price": total_price, "unit_price": unit_price}
+
+
+def list_orders(dealership_id: int | None = None) -> list[dict[str, Any]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    params: list[Any] = []
+    where_sql = ""
+    if dealership_id:
+        where_sql = "WHERE cars.dealership_id=?"
+        params.append(dealership_id)
+    cur.execute(
+        f"""
+        SELECT orders.*, cars.title AS car_title, cars.dealership_id
+        FROM orders
+        JOIN cars ON cars.id = orders.car_id
+        {where_sql}
+        ORDER BY orders.id DESC
+        LIMIT 100
+        """,
+        params,
+    )
+    items = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return items
 
 
 def save_uploaded_image(raw_data: bytes, original_name: str = "") -> str:
@@ -1381,6 +1487,54 @@ async def api_registration_check(request: web.Request) -> web.Response:
     tg_id = int(request.query.get("tg_id", "0"))
     return web.json_response({"is_registered": bool(tg_id and get_user_phone(tg_id))})
 
+async def api_customer_search(request: web.Request) -> web.Response:
+    tg_id = int(request.query.get("tg_id", "0"))
+    if not is_admin(tg_id):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    query = str(request.query.get("q", "")).strip()
+    if len(query) < 2:
+        return web.json_response({"ok": True, "items": []})
+    return web.json_response({"ok": True, "items": search_customers(query)})
+
+
+async def api_orders(request: web.Request) -> web.Response:
+    if request.method == "GET":
+        tg_id = int(request.query.get("tg_id", "0"))
+        dealership_id = int(request.query.get("dealership_id", "0") or 0)
+    else:
+        data = await request.json() if request.can_read_body else {}
+        tg_id = int(data.get("tg_id", request.query.get("tg_id", 0)))
+        dealership_id = 0
+    if not is_admin(tg_id):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+
+    if request.method == "GET":
+        return web.json_response({"ok": True, "items": list_orders(dealership_id if dealership_id else None)})
+
+    data = await request.json() if request.can_read_body else {}
+    car_id = int(str(data.get("car_id", "0") or "0"))
+    customer_name = str(data.get("customer_name", "")).strip()
+    customer_phone = str(data.get("customer_phone", "")).strip()
+    quantity = int(str(data.get("quantity", "0") or "0"))
+    address = str(data.get("address", "")).strip()
+    if not all([car_id, customer_name, customer_phone, quantity > 0, address]):
+        return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+
+    created = create_order(
+        car_id=car_id,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        quantity=quantity,
+        address=address,
+        created_by=tg_id,
+    )
+    if created is None:
+        return web.json_response({"ok": False, "error": "not_found"}, status=404)
+    if created.get("error") == "insufficient_stock":
+        return web.json_response({"ok": False, "error": "insufficient_stock", "stock_quantity": created.get("stock_quantity", 0)}, status=400)
+    return web.json_response({"ok": True, **created})
+
+
 async def api_support(request: web.Request) -> web.Response:
     data = await request.json()
     user_id = int(data.get("tg_id", 0))
@@ -1421,6 +1575,9 @@ async def run_web(bot: Bot) -> None:
     app.router.add_put("/api/dealerships/{dealership_id}", api_manage_dealership)
     app.router.add_get("/api/is-admin", api_admin_check)
     app.router.add_get("/api/is-registered", api_registration_check)
+    app.router.add_get("/api/customer-search", api_customer_search)
+    app.router.add_get("/api/orders", api_orders)
+    app.router.add_post("/api/orders", api_orders)
     app.router.add_post("/api/support", api_support)
     app.router.add_static("/webapp", path="webapp", show_index=False)
 

@@ -120,6 +120,23 @@
     <section id="adminBox" class="support-box hidden">
       <h2>Панель администратора</h2>
       <p class="subtitle">Добавление и редактирование автомобиля с выбором автосалона и валюты.</p>
+            <div class="order-inline-box">
+        <h3>Buyurtma yaratish</h3>
+        <form id="quickOrderForm" class="admin-form quick-order-form">
+          <select id="order_car_id" required>
+            <option value="">Выберите продукт</option>
+          </select>
+          <p id="orderStockHint" class="subtitle">Остаток на складе: —</p>
+          <input id="order_customer_name" placeholder="Имя клиента" required />
+          <input id="order_customer_phone" placeholder="Номер клиента" required />
+          <div id="customerSuggestions" class="customer-suggestions"></div>
+          <input id="order_quantity" type="number" min="1" step="1" placeholder="Miqdor" required />
+          <p id="orderTotalHint" class="subtitle">Общая сумма: —</p>
+          <input id="order_address" placeholder="Адрес" required />
+          <button type="submit" class="btn">Создать заказ</button>
+        </form>
+        <p id="quickOrderStatus" class="subtitle"></p>
+      </div>
       <form id="adminForm" class="admin-form">
         <input type="hidden" id="carId" />
         <select id="dealership_id" required></select>
@@ -158,6 +175,7 @@
           <option value="0">Неактивный</option>
         </select>
         <input id="video_url" placeholder="Ссылка на видео (YouTube, необязательно)" />
+        <input id="stock_quantity" type="number" min="0" step="1" placeholder="Остаток на складе" value="0" />
         <div class="admin-actions">
           <button type="submit" class="btn">Сохранить</button>
           <button type="button" id="cancelEdit" class="btn btn-secondary hidden">Отмена</button>

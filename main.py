@@ -23,11 +23,11 @@ from aiogram.types import (
     WebAppInfo,
 )
 proxy = "socks5://127.0.0.1:9050"
-# session = AiohttpSession(proxy=proxy)
-BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
-# BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
-# WEBAPP_BASE_URL = "https://app.majormotors.uz"
-WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
+session = AiohttpSession(proxy=proxy)
+# BOT_TOKEN = "8485302210:AAH_cHt86GVugNhNQYaprZNs-d8zN0QH0sU"
+BOT_TOKEN = "8359928524:AAFRujabXJp24BY3WMYhzn9_WUqo1ofD4Pg"
+WEBAPP_BASE_URL = "https://app.majormotors.uz"
+# WEBAPP_BASE_URL = "https://subcommissarial-paris-untensely.ngrok-free.dev"
 SUPPORT_GROUP_ID = -1003739992037
 ADMIN_IDS = {
     int(user_id.strip())
@@ -1367,11 +1367,11 @@ async def main() -> None:
 
     # 🔥 Tor proxy
     proxy = "socks5://127.0.0.1:9050"
-    # session = AiohttpSession(proxy=proxy)
+    session = AiohttpSession(proxy=proxy)
 
     bot = Bot(
         BOT_TOKEN,
-        # session=session,
+        session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 

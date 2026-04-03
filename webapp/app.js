@@ -176,6 +176,29 @@ function closeCarDetails() {
   carDetailsContent.innerHTML = '';
 }
 
+function getCarDetailsLink(carId) {
+  const url = new URL(window.location.href);
+  url.hash = `car-${carId}`;
+  return url.toString();
+}
+
+function getRequestedCarIdFromUrl() {
+  const hashValue = String(window.location.hash || '');
+  if (hashValue.startsWith('#car-')) {
+    const hashId = Number(hashValue.replace('#car-', ''));
+    if (Number.isFinite(hashId) && hashId > 0) {
+      return hashId;
+    }
+  }
+
+  const queryId = Number(params.get('car_id'));
+  if (Number.isFinite(queryId) && queryId > 0) {
+    return queryId;
+  }
+
+  return 0;
+}
+
 function openDealershipList() {
   dealershipSection.classList.remove('hidden');
   submenuSection.classList.add('hidden');
@@ -632,9 +655,10 @@ window.openCar = async (id, source = 'catalog') => {
 
   const car = await res.json();
   currentCarSource = source;
-  if (source === 'promo') {
+  if (!currentDealership || Number(currentDealership.id) !== Number(car.dealership_id) || source === 'promo') {
     await setCurrentDealershipById(car.dealership_id);
   }
+  const detailsLink = getCarDetailsLink(car.id);
   closeCarDetails();
   carDetailsContent.innerHTML = `
     <article class="card car-details-card">
@@ -646,6 +670,7 @@ window.openCar = async (id, source = 'catalog') => {
           <li><b>Марка:</b> ${car.brand || 'Без марки'}</li>
           <li><b>Двигатель:</b> ${car.engine}</li>
         </ul>
+
       </div>
     </article>
     <section class="description-box">
@@ -944,6 +969,7 @@ window.addEventListener('popstate', () => {
 
 (async () => {
   const splashPromise = playStartupSplash();
+  const requestedCarId = getRequestedCarIdFromUrl();
   const adminCheck = await fetch(`/api/is-admin?tg_id=${tgId}`);
   if (adminCheck.ok) {
     const data = await adminCheck.json();
@@ -956,7 +982,11 @@ window.addEventListener('popstate', () => {
 
   await loadDealerships();
   await loadPromoCars();
-  openDealershipList();
+  if (requestedCarId) {
+    await openCar(requestedCarId, 'link');
+  } else {
+    openDealershipList();
+  }
   updateSocialBar();
   await splashPromise;
 })();

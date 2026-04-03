@@ -177,12 +177,30 @@ function closeCarDetails() {
 }
 
 function getCarDetailsLink(carId) {
+  const tg = window.Telegram?.WebApp;
+
+  // Если открыто внутри Telegram Mini App
+  if (tg && tg.initDataUnsafe) {
+    return `https://t.me/MajorSamarkandBOT?startapp=car-${carId}`;
+  }
+
+  // Обычная ссылка для браузера
   const url = new URL(window.location.href);
   url.hash = `car-${carId}`;
   return url.toString();
 }
 
 function getRequestedCarIdFromUrl() {
+  // 1. Сначала проверяем Telegram start_param
+  const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param || '';
+  if (startParam.startsWith('car-')) {
+    const tgId = Number(startParam.replace('car-', ''));
+    if (Number.isFinite(tgId) && tgId > 0) {
+      return tgId;
+    }
+  }
+
+  // 2. Потом обычный hash: #car-10
   const hashValue = String(window.location.hash || '');
   if (hashValue.startsWith('#car-')) {
     const hashId = Number(hashValue.replace('#car-', ''));
@@ -191,7 +209,9 @@ function getRequestedCarIdFromUrl() {
     }
   }
 
-  const queryId = Number(params.get('car_id'));
+  // 3. Потом query param: ?car_id=10
+  const url = new URL(window.location.href);
+  const queryId = Number(url.searchParams.get('car_id'));
   if (Number.isFinite(queryId) && queryId > 0) {
     return queryId;
   }

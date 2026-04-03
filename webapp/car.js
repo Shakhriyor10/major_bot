@@ -126,18 +126,6 @@ function normalizeExternalUrl(rawUrl) {
 }
 
 
-
-async function fetchGeneratedDescription(carId, fallbackDescription = '') {
-  try {
-    const res = await fetch(`/api/cars/${carId}/description?tg_id=${tgId}`);
-    if (!res.ok) return String(fallbackDescription || '');
-    const data = await res.json();
-    return String(data.description || fallbackDescription || '');
-  } catch (_) {
-    return String(fallbackDescription || '');
-  }
-}
-
 function getCarImages(car) {
   return [car.image_url, car.image_url_2, car.image_url_3, car.image_url_4, car.image_url_5]
     .map((url) => String(url || '').trim())
@@ -257,9 +245,7 @@ async function loadCar() {
 
   const descriptionNode = document.getElementById('carDescriptionText');
   if (descriptionNode) {
-    descriptionNode.textContent = 'Генерируем описание...';
-    const generated = await fetchGeneratedDescription(car.id, car.description);
-    descriptionNode.textContent = generated || 'Описание временно недоступно.';
+    descriptionNode.textContent = String(car.description || '');
   }
 
   initCarousel(root);

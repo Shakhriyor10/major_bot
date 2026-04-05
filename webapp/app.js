@@ -409,7 +409,6 @@ function renderPromoCars() {
               <img src="${getCarImages(car)[0] || 'https://placehold.co/800x500/1f2937/ffffff?text=Auto'}" alt="${car.title}" class="promo-image" />
               <span class="promo-overlay"></span>
               <span class="promo-caption">
-                <span class="promo-kicker">Реклама</span>
                 <span class="promo-title">${car.title}</span>
                 <span class="promo-price-wrap">${renderPriceBlock(car)}</span>
               </span>

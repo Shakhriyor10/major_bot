@@ -699,3 +699,22 @@ textarea { min-height: 90px; }
 .promo-nav:hover {
   background: rgba(0, 0, 0, 0.55);
 }
+.order-inline-box {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+}
+
+.customer-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customer-suggestion {
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+}
